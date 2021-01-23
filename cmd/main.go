@@ -4,51 +4,60 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
 	"github.com/pkg/errors"
+	"github.com/rssujay/golang-ble-test/devicemanager"
 )
 
 var (
-	device = "laptop_la"
+	device = "laptop"
 	du     = 5 * time.Second
 	dup    = true
 )
 
 func main() {
-	d, err := linux.NewDeviceWithName(device)
+	devices := devicemanager.DeviceMap{}
+	central, err := linux.NewDeviceWithName(device)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
 	}
-	ble.SetDefaultDevice(d)
+
+	ble.SetDefaultDevice(central)
 
 	// Scan for specified duration, or until interrupted by user.
-	fmt.Printf("Scanning for %s...\n", du)
+	finished := make(chan bool)
 	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), du))
-	chkErr(ble.Scan(ctx, dup, advHandler, nil))
+	go scan(ctx, &devices, finished)
+
+	// Print Entries
+	<-finished
+	devices.PrintEntries()
 }
 
-func advHandler(a ble.Advertisement) {
-	if a.Connectable() {
-		fmt.Printf("[%s] C %3d:", a.Addr(), a.RSSI())
-	} else {
-		fmt.Printf("[%s] N %3d:", a.Addr(), a.RSSI())
+func scan(parentCtx context.Context, dm *devicemanager.DeviceMap, finished chan bool) {
+	fmt.Printf("Scanning for %s...\n", du)
+	chkErr(ble.Scan(parentCtx, dup, advHandlerWrapper(dm), nil))
+	finished <- true
+}
+
+func advHandlerWrapper(dm *devicemanager.DeviceMap) ble.AdvHandler {
+	return func(a ble.Advertisement) {
+		detectedDevice := devicemanager.Device{
+			Address:     a.Addr().String(),
+			Detected:    time.Now(),
+			Connectable: a.Connectable(),
+			Services:    a.Services(),
+			Name:        clean(a.LocalName()),
+			RSSI:        a.RSSI(),
+		}
+
+		dm.SetDevice(a.Addr().String(), detectedDevice)
 	}
-	comma := ""
-	if len(a.LocalName()) > 0 {
-		fmt.Printf(" Name: %s", a.LocalName())
-		comma = ","
-	}
-	if len(a.Services()) > 0 {
-		fmt.Printf("%s Svcs: %v", comma, a.Services())
-		comma = ","
-	}
-	if len(a.ManufacturerData()) > 0 {
-		fmt.Printf("%s MD: %X", comma, a.ManufacturerData())
-	}
-	fmt.Printf("\n")
 }
 
 func chkErr(err error) {
@@ -61,4 +70,22 @@ func chkErr(err error) {
 	default:
 		log.Fatalf(err.Error())
 	}
+}
+
+// reformat string for proper display of hex
+func formatHex(instr string) (outstr string) {
+	outstr = ""
+	for i := range instr {
+		if i%2 == 0 {
+			outstr += instr[i:i+2] + " "
+		}
+	}
+	return
+}
+
+// clean up the non-ASCII characters
+func clean(input string) string {
+	return strings.TrimFunc(input, func(r rune) bool {
+		return !unicode.IsGraphic(r)
+	})
 }
