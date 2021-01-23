@@ -21,7 +21,7 @@ type Device struct {
 // DeviceMap is a concurrency-safe store of <MAC address: Device object>
 type DeviceMap struct {
 	sync.RWMutex
-	dm map[string]Device
+	Dm map[string]Device
 }
 
 // GetDevice retrieves an entry from the provided device map if one exists,
@@ -29,7 +29,7 @@ type DeviceMap struct {
 func (d *DeviceMap) GetDevice(addr string) Device {
 	d.RLock()
 	defer d.RUnlock()
-	device, exist := d.dm[addr]
+	device, exist := d.Dm[addr]
 	if exist {
 		return device
 	}
@@ -40,7 +40,7 @@ func (d *DeviceMap) GetDevice(addr string) Device {
 func (d *DeviceMap) SetDevice(addr string, device Device) {
 	d.Lock()
 	defer d.Unlock()
-	d.dm[addr] = device
+	d.Dm[addr] = device
 }
 
 // PrintEntries can be used for debugging entries found and stored during scan
@@ -48,7 +48,7 @@ func (d *DeviceMap) PrintEntries() {
 	d.RLock()
 	defer d.RUnlock()
 
-	for k, v := range d.dm {
+	for k, v := range d.Dm {
 		fmt.Println("Key: ", k, " Entry: ", v)
 	}
 }

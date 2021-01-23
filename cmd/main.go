@@ -21,7 +21,9 @@ var (
 )
 
 func main() {
-	devices := devicemanager.DeviceMap{}
+	devices := devicemanager.DeviceMap{
+		Dm: make(map[string]devicemanager.Device),
+	}
 	central, err := linux.NewDeviceWithName(device)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
