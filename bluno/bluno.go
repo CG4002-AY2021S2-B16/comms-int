@@ -24,9 +24,9 @@ func (b *Bluno) Connect() ble.Client {
 
 	client, err := ble.Dial(ctx, ble.NewAddr(b.Address))
 	if err != nil {
+		fmt.Println("Can't find", err)
 		return nil
 	}
-	defer client.CancelConnection()
 	fmt.Println("Done", client.Addr().String(), client.ReadRSSI())
 	return client
 }
