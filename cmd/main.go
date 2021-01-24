@@ -11,37 +11,32 @@ import (
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
 	"github.com/pkg/errors"
+	"github.com/rssujay/golang-ble-test/bluno"
+	"github.com/rssujay/golang-ble-test/constants"
 	"github.com/rssujay/golang-ble-test/devicemanager"
 )
 
-var (
-	device = "laptop"
-	du     = 5 * time.Second
-	dup    = true
-)
+func initHCI() {
+	d, err := linux.NewDevice()
+	if err != nil {
+		log.Fatal("Can't create new device", err)
+	}
+	ble.SetDefaultDevice(d)
+}
 
 func main() {
-	devices := devicemanager.DeviceMap{}
-	central, err := linux.NewDeviceWithName(device)
-	if err != nil {
-		log.Fatalf("can't new device : %s", err)
+	log.SetFlags(log.Ldate | log.Lmicroseconds)
+	initHCI()
+	//devices := devicemanager.DeviceMap{}
+
+	for _, b := range constants.RetrieveValidBlunos() {
+		b.Connect()
 	}
-
-	ble.SetDefaultDevice(central)
-
-	// Scan for specified duration, or until interrupted by user.
-	finished := make(chan bool)
-	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), du))
-	go scan(ctx, &devices, finished)
-
-	// Print Entries
-	<-finished
-	devices.PrintEntries()
 }
 
 func scan(parentCtx context.Context, dm *devicemanager.DeviceMap, finished chan bool) {
-	fmt.Printf("Scanning for %s...\n", du)
-	chkErr(ble.Scan(parentCtx, dup, advHandlerWrapper(dm), nil))
+	fmt.Printf("Scanning for %s...\n", bluno.DefaultTimeout)
+	chkErr(ble.Scan(parentCtx, true, advHandlerWrapper(dm), nil))
 	finished <- true
 }
 
