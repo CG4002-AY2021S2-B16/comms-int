@@ -1,19 +1,13 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"strings"
 	"time"
-	"unicode"
 
-	"github.com/CG4002-AY2021S2-B16/comms-int/bluno"
 	"github.com/CG4002-AY2021S2-B16/comms-int/constants"
-	"github.com/CG4002-AY2021S2-B16/comms-int/devicemanager"
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
-	"github.com/pkg/errors"
 )
 
 func initHCI() {
@@ -35,45 +29,6 @@ func main() {
 		explore(client, prof)
 		client.CancelConnection()
 	}
-}
-
-func scan(parentCtx context.Context, dm *devicemanager.DeviceMap, finished chan bool) {
-	fmt.Printf("Scanning for %s...\n", bluno.DefaultTimeout)
-	chkErr(ble.Scan(parentCtx, true, advHandlerWrapper(dm), nil))
-	finished <- true
-}
-
-func advHandlerWrapper(dm *devicemanager.DeviceMap) ble.AdvHandler {
-	return func(a ble.Advertisement) {
-		detectedDevice := devicemanager.Device{
-			Address:     a.Addr().String(),
-			Detected:    time.Now(),
-			Connectable: a.Connectable(),
-			Services:    a.Services(),
-			Name:        clean(a.LocalName()),
-			RSSI:        a.RSSI(),
-		}
-
-		dm.SetDevice(a.Addr().String(), detectedDevice)
-	}
-}
-
-// reformat string for proper display of hex
-func formatHex(instr string) (outstr string) {
-	outstr = ""
-	for i := range instr {
-		if i%2 == 0 {
-			outstr += instr[i:i+2] + " "
-		}
-	}
-	return
-}
-
-// clean up the non-ASCII characters
-func clean(input string) string {
-	return strings.TrimFunc(input, func(r rune) bool {
-		return !unicode.IsGraphic(r)
-	})
 }
 
 func explore(cln ble.Client, p *ble.Profile) error {
@@ -171,14 +126,35 @@ func propString(p ble.Property) string {
 	return s
 }
 
-func chkErr(err error) {
-	switch errors.Cause(err) {
-	case nil:
-	case context.DeadlineExceeded:
-		fmt.Printf("done\n")
-	case context.Canceled:
-		fmt.Printf("canceled\n")
-	default:
-		log.Fatalf(err.Error())
-	}
-}
+// func advHandlerWrapper(dm *devicemanager.DeviceMap) ble.AdvHandler {
+// 	return func(a ble.Advertisement) {
+// 		detectedDevice := devicemanager.Device{
+// 			Address:     a.Addr().String(),
+// 			Detected:    time.Now(),
+// 			Connectable: a.Connectable(),
+// 			Services:    a.Services(),
+// 			Name:        utils.CleanString(a.LocalName()),
+// 			RSSI:        a.RSSI(),
+// 		}
+
+// 		dm.SetDevice(a.Addr().String(), detectedDevice)
+// 	}
+// }
+
+// func scan(parentCtx context.Context, dm *devicemanager.DeviceMap, finished chan bool) {
+// 	fmt.Printf("Scanning for %s...\n", bluno.DefaultTimeout)
+// 	chkErr(ble.Scan(parentCtx, true, advHandlerWrapper(dm), nil))
+// 	finished <- true
+// }
+
+// func chkErr(err error) {
+// 	switch errors.Cause(err) {
+// 	case nil:
+// 	case context.DeadlineExceeded:
+// 		fmt.Printf("done\n")
+// 	case context.Canceled:
+// 		fmt.Printf("canceled\n")
+// 	default:
+// 		log.Fatalf(err.Error())
+// 	}
+// }

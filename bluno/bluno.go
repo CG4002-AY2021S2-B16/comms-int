@@ -18,15 +18,15 @@ type Bluno struct {
 const DefaultTimeout time.Duration = 1 * time.Second
 
 // Connect establishes a connection with the physical bluno
+// **Remember to close client when done
 func (b *Bluno) Connect() ble.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
 	client, err := ble.Dial(ctx, ble.NewAddr(b.Address))
 	if err != nil {
-		fmt.Println("Can't find", err)
+		fmt.Println("Can't find client", err)
 		return nil
 	}
-	fmt.Println("Done", client.Addr().String(), client.ReadRSSI())
 	return client
 }
