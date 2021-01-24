@@ -1,4 +1,4 @@
-module github.com/rssujay/golang-ble-test
+module github.com/CG4002-AY2021S2-B16/comms-int
 
 go 1.15
 

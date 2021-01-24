@@ -8,12 +8,12 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/CG4002-AY2021S2-B16/comms-int/bluno"
+	"github.com/CG4002-AY2021S2-B16/comms-int/constants"
+	"github.com/CG4002-AY2021S2-B16/comms-int/devicemanager"
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
 	"github.com/pkg/errors"
-	"github.com/rssujay/golang-ble-test/bluno"
-	"github.com/rssujay/golang-ble-test/constants"
-	"github.com/rssujay/golang-ble-test/devicemanager"
 )
 
 func initHCI() {

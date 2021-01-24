@@ -1,7 +1,7 @@
 package constants
 
 import (
-	"github.com/rssujay/golang-ble-test/bluno"
+	"github.com/CG4002-AY2021S2-B16/comms-int/bluno"
 )
 
 // RetrieveValidBlunos retrieves the list of Blunos this central should be concerned with
