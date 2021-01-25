@@ -51,6 +51,10 @@ func (b *Bluno) Connect(c chan bool) {
 // Listen receives incoming connections from bluno
 // - to be called inside a goroutine
 func (b *Bluno) Listen(wg *sync.WaitGroup) {
+	defer wg.Done()
+	defer b.Client.CancelConnection()
+	defer b.Client.ClearSubscriptions()
+
 	//h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
 	svcUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoServiceReducedUUID)}
 	charUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoCharacteristicReducedUUID)}
@@ -61,7 +65,6 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) {
 		if commsintconfig.DebugMode {
 			log.Printf("client_svc_discovery_err|addr=%s|err=%s|len_svcs=%d", b.Address, err, len(s))
 		}
-		b.Client.CancelConnection()
 		return
 	}
 
@@ -71,7 +74,6 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) {
 		if commsintconfig.DebugMode {
 			log.Printf("client_char_discovery_err|addr=%s|err=%s", b.Address, err)
 		}
-		b.Client.CancelConnection()
 		return
 	}
 	characteristic := c[0]
@@ -105,15 +107,12 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) {
 		select {
 		case <-b.Client.Disconnected():
 		case <-errorCh:
-			b.Client.CancelConnection()
 			return
 		case msg := <-msgCh:
 			if commsintconfig.DebugMode {
 				log.Printf("client_incoming_msg|addr=%s|msg=%s", b.Address, msg)
 			}
-			b.Client.CancelConnection()
 			return
 		}
 	}
-	wg.Done()
 }

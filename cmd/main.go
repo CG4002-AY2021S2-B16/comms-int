@@ -11,19 +11,20 @@ import (
 	"github.com/go-ble/ble/linux"
 )
 
-func initHCI() {
+func initHCI() *linux.Device {
 	d, err := linux.NewDevice()
 	if err != nil {
 		log.Fatal("Can't create new device ", err)
 	}
 	ble.SetDefaultDevice(d)
+	return d
 }
 
 func main() {
 	if commsintconfig.DebugMode {
 		log.SetFlags(log.Ldate | log.Lmicroseconds)
 	}
-	initHCI()
+	d := initHCI()
 	//devices := devicemanager.DeviceMap{}
 
 	// 1 mastergoroutine per bluno
@@ -48,4 +49,6 @@ func main() {
 	}
 
 	wg.Wait()
+	d.Stop()
+	log.Println("Stop called")
 }
