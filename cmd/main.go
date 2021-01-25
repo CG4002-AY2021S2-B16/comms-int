@@ -4,6 +4,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/CG4002-AY2021S2-B16/comms-int/bluno"
 	"github.com/CG4002-AY2021S2-B16/comms-int/commsintconfig"
 	"github.com/CG4002-AY2021S2-B16/comms-int/constants"
 	"github.com/go-ble/ble"
@@ -33,17 +34,17 @@ func main() {
 		// Asynchronously establish connection to Bluno and listen to incoming messages from peripheral
 		wg.Add(1)
 
-		go func() {
+		go func(blno *bluno.Bluno) {
 			// A channel is used to block until successful connection
 			complete := make(chan bool)
-			go b.Connect(complete)
+			go blno.Connect(complete)
 			success := <-complete
 			if success {
-				go b.Listen(&wg)
+				go blno.Listen(&wg)
 			} else {
 				wg.Done()
 			}
-		}()
+		}(&b)
 	}
 
 	wg.Wait()
