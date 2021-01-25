@@ -48,36 +48,3 @@ func main() {
 
 	wg.Wait()
 }
-
-// func advHandlerWrapper(dm *devicemanager.DeviceMap) ble.AdvHandler {
-// 	return func(a ble.Advertisement) {
-// 		detectedDevice := devicemanager.Device{
-// 			Address:     a.Addr().String(),
-// 			Detected:    time.Now(),
-// 			Connectable: a.Connectable(),
-// 			Services:    a.Services(),
-// 			Name:        utils.CleanString(a.LocalName()),
-// 			RSSI:        a.RSSI(),
-// 		}
-
-// 		dm.SetDevice(a.Addr().String(), detectedDevice)
-// 	}
-// }
-
-// func scan(parentCtx context.Context, dm *devicemanager.DeviceMap, finished chan bool) {
-// 	fmt.Printf("Scanning for %s...\n", bluno.DefaultTimeout)
-// 	chkErr(ble.Scan(parentCtx, true, advHandlerWrapper(dm), nil))
-// 	finished <- true
-// }
-
-// func chkErr(err error) {
-// 	switch errors.Cause(err) {
-// 	case nil:
-// 	case context.DeadlineExceeded:
-// 		fmt.Printf("done\n")
-// 	case context.Canceled:
-// 		fmt.Printf("canceled\n")
-// 	default:
-// 		log.Fatalf(err.Error())
-// 	}
-// }
