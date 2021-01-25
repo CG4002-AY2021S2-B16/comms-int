@@ -2,7 +2,7 @@ package bluno
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/go-ble/ble"
@@ -20,12 +20,10 @@ const DefaultTimeout time.Duration = 1 * time.Second
 // Connect establishes a connection with the physical bluno
 // **Remember to close client when done
 func (b *Bluno) Connect() ble.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), DefaultTimeout))
 	client, err := ble.Dial(ctx, ble.NewAddr(b.Address))
 	if err != nil {
-		fmt.Println("Can't find client", err)
+		log.Printf("client_connection|addr=%s|err=%s", b.Address, err)
 		return nil
 	}
 	return client

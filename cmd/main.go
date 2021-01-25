@@ -25,9 +25,11 @@ func main() {
 
 	for _, b := range constants.RetrieveValidBlunos() {
 		client := b.Connect()
-		prof, _ := client.DiscoverProfile(true)
-		explore(client, prof)
-		client.CancelConnection()
+		if client != nil {
+			prof, _ := client.DiscoverProfile(true)
+			explore(client, prof)
+			client.CancelConnection()
+		}
 	}
 }
 
