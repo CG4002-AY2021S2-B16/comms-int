@@ -85,7 +85,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 	err = b.Client.Subscribe(characteristic, false, func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) })
 	if err != nil {
 		if commsintconfig.DebugMode {
-			log.Println("client_subscription_err|addr=%s|err=%s", b.Address, err)
+			log.Printf("client_subscription_err|addr=%s|err=%s", b.Address, err)
 		}
 		return false
 	}
@@ -93,7 +93,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 
 	// Handshake
 	log.Println("Handshaking")
-	b.Client.WriteCharacteristic(characteristic, []byte{'e', 'v'}, true)
+	b.Client.WriteCharacteristic(characteristic, []byte{'A', 'B', 'C'}, true)
 	log.Println("Handshaking done")
 
 	// Read
