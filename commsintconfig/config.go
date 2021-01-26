@@ -21,5 +21,5 @@ var BlunoCharacteristicReducedUUID uint16 = 0xdfb1
 // https://www.dfrobot.com/forum/viewtopic.php?t=2035
 var ClientCharacteristicConfig uint16 = 0x2902
 
-// ClientCharacteristicConfigHandle - same as above
+// ClientCharacteristicConfigHandle - https://www.dfrobot.com/forum/viewtopic.php?t=148
 var ClientCharacteristicConfigHandle uint16 = 0x0025

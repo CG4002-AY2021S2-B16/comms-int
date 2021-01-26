@@ -58,6 +58,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 	svcUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoServiceReducedUUID), ble.MustParse(commsintconfig.BlunoServiceUUID)}
 	charUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoCharacteristicReducedUUID), ble.MustParse(commsintconfig.BlunoCharacteristicUUID)}
 
+	// Isolate the service
 	s, err := b.Client.DiscoverServices(svcUUID)
 	if err != nil || len(s) != 1 {
 		if commsintconfig.DebugMode {
@@ -74,7 +75,8 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 		}
 		return false
 	}
-	log.Println(s, c)
+
+	// Add 2902, because its missing from Bluno: https://www.dfrobot.com/forum/viewtopic.php?t=2035
 	characteristic := c[0]
 	customDescriptor := ble.NewDescriptor(ble.UUID16(commsintconfig.ClientCharacteristicConfig))
 	customDescriptor.Handle = commsintconfig.ClientCharacteristicConfigHandle
@@ -82,11 +84,11 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 
 	err = b.Client.Subscribe(characteristic, false, func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) })
 	if err != nil {
-		log.Println("ERR1", err)
-	} else {
-		log.Println("OK1", err)
+		if commsintconfig.DebugMode {
+			log.Println("client_subscription_err|addr=%s|err=%s", b.Address, err)
+		}
+		return false
 	}
-
 	defer b.Client.ClearSubscriptions()
 
 	// Handshake
@@ -115,22 +117,4 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 			}
 		}
 	}
-}
-
-func getMatchingService(services []ble.Service, uuid ble.UUID) int {
-	for idx, s := range services {
-		if s.UUID.Equal(uuid) {
-			return idx
-		}
-	}
-	return -1
-}
-
-func getMatchingCharacteristic(characteristics []ble.Characteristic, uuid ble.UUID) int {
-	for idx, c := range characteristics {
-		if c.UUID.Equal(uuid) {
-			return idx
-		}
-	}
-	return -1
 }
