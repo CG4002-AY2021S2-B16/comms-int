@@ -11,44 +11,38 @@ import (
 	"github.com/go-ble/ble/linux"
 )
 
-func initHCI() *linux.Device {
+func main() {
+	if commsintconfig.DebugMode {
+		log.SetFlags(log.Ldate | log.Lmicroseconds)
+	}
+
 	d, err := linux.NewDevice()
 	if err != nil {
 		log.Fatal("Can't create new device ", err)
 	}
 	ble.SetDefaultDevice(d)
-	return d
-}
+	defer d.Stop()
 
-func main() {
-	if commsintconfig.DebugMode {
-		log.SetFlags(log.Ldate | log.Lmicroseconds)
-	}
-	d := initHCI()
-	//devices := devicemanager.DeviceMap{}
-
-	// 1 mastergoroutine per bluno
-	// - manages connecting
 	wg := sync.WaitGroup{}
 
 	for _, b := range constants.RetrieveValidBlunos() {
+		// 1 master goroutine per bluno
 		// Asynchronously establish connection to Bluno and listen to incoming messages from peripheral
 		wg.Add(1)
 
 		go func(blno *bluno.Bluno) {
-			// A channel is used to block until successful connection
-			complete := make(chan bool)
-			go blno.Connect(complete)
-			success := <-complete
-			if success {
-				go blno.Listen(&wg)
-			} else {
-				wg.Done()
+			for {
+				success := blno.Connect()
+				if success {
+					if listenCancel := blno.Listen(&wg); listenCancel {
+						return
+					}
+				}
 			}
 		}(&b)
 	}
 
-	wg.Wait()
-	d.Stop()
 	log.Println("Stop called")
+	wg.Wait()
+	log.Println("Stop finalized")
 }
