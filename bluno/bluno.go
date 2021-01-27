@@ -144,8 +144,10 @@ func (b *Bluno) parseResponse(resp []byte) {
 func determinePacketType(d []byte) commsintconfig.PacketType {
 	if d[0] == commsintconfig.RespHandshakeSymbol {
 		return commsintconfig.Ack
+	} else if d[0] == commsintconfig.RespDataSymbol {
+		return commsintconfig.Data
 	}
-	return commsintconfig.Data
+	return commsintconfig.Invalid
 }
 
 // twoByteToNum converts 2 consecutive bytes into a uint16

@@ -30,11 +30,8 @@ var InitHandshakeSymbol byte = 'A'
 // RespHandshakeSymbol is the symbol received from a successful handshake attempt
 var RespHandshakeSymbol byte = 'B'
 
-// LeadingBytes refers to the number of expected leading bytes of value FF in an incoming packet
-var LeadingBytes int = 2
-
-// TrailingBytes refers to the number of expected trailing bytes of value FF in an incoming packet
-var TrailingBytes int = 1
+// RespDataSymbol is the symbol received from a successful data response
+var RespDataSymbol byte = 'C'
 
 // ExpectedPacketSize refers to the number of useful bytes of data within an incoming packet
 var ExpectedPacketSize int = 20
@@ -47,6 +44,8 @@ const (
 	Ack PacketType = 0
 	// Data is a PacketType that refers to a response containing data
 	Data PacketType = 1
+	// Invalid is a PacketType that we are not sure about
+	Invalid PacketType = 2
 )
 
 // Packet is constructed from a complete bluetooth response

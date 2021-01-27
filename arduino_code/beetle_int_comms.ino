@@ -3,10 +3,12 @@
 
 // 65280 in decimal (FF00) onwards is reserved for protocol
 uint16_t val = 65535; //FFFE
+bool handshake_done = false;
 
 // Handshake constants
 char HANDSHAKE_INIT = 'A';
 char HANDSHAKE_RESPONSE = 'B';
+char DATA_RESPONSE = 'C';
 
 // Buffer used to write to bluetooth
 char sendBuffer[PACKET_SIZE + 1]; 
@@ -51,6 +53,19 @@ void PrepareHandshakeAck(char* buf) {
 }
 
 
+// PrepareDataPacket prepares the data to be sent out
+void PrepareDataPacket(char* buf) {
+  memset(buf, '0', PACKET_SIZE);
+  *buf = DATA_RESPONSE;
+  val -= 1;
+  char* done = addDataToBuffer(++buf, val, val-1, val-2, val-3, val-4, val-5);
+
+  // Checksum
+  memset(done, '1', 1);
+}
+
+
+
 void setup() {
   sendBuffer[PACKET_SIZE] = '\0';
   Serial.begin(115200);
@@ -65,6 +80,12 @@ void loop()
     if (Serial.read() == HANDSHAKE_INIT) {
       PrepareHandshakeAck(sendBuffer);
       Serial.write(sendBuffer, PACKET_SIZE);
-    }
+      handshake_done = true;
+    } 
+  }
+  else if (handshake_done) {
+      PrepareDataPacket(sendBuffer);
+      Serial.write(sendBuffer, PACKET_SIZE);
+      delay(10);
   }
 }  
