@@ -1,5 +1,5 @@
 // Packet Specification
-#define PACKET_SIZE 18
+#define PACKET_SIZE 20
 
 
 uint16_t val = 541; //0000 0010 0001 1101 -> 02 1D
@@ -30,8 +30,8 @@ void addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t ya
   next = addIntToBuffer(next, y);
   next = addIntToBuffer(next, z);
   next = addIntToBuffer(next, yaw);
-  next = addIntToBuffer(next, roll);
   next = addIntToBuffer(next, pitch);
+  next = addIntToBuffer(next, roll);
 }
 
 

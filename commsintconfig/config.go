@@ -26,3 +26,36 @@ var ClientCharacteristicConfigHandle uint16 = 0x0025
 
 // InitHandshakeSymbol is the symbol used for handshake initialization
 var InitHandshakeSymbol byte = 'A'
+
+// RespHandshakeSymbol is the symbol received from a successful handshake attempt
+var RespHandshakeSymbol byte = 'B'
+
+// LeadingBytes refers to the number of expected leading bytes of value FF in an incoming packet
+var LeadingBytes int = 2
+
+// TrailingBytes refers to the number of expected trailing bytes of value FF in an incoming packet
+var TrailingBytes int = 1
+
+// ExpectedPacketSize refers to the number of useful bytes of data within an incoming packet
+var ExpectedPacketSize int = 13
+
+// PacketType is an enum type which signifies the type of packet received from the Bluno
+type PacketType uint8
+
+const (
+	// Ack is a PacketType that refers to a handshake response
+	Ack PacketType = 0
+	// Data is a PacketType that refers to a response containing data
+	Data PacketType = 1
+)
+
+// Packet is constructed from a complete bluetooth response
+type Packet struct {
+	Type  PacketType
+	X     uint16
+	Y     uint16
+	Z     uint16
+	Yaw   uint16
+	Pitch uint16
+	Roll  uint16
+}

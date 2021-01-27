@@ -2,7 +2,7 @@ package bluno
 
 import (
 	"context"
-	"fmt"
+	"encoding/binary"
 	"log"
 	"sync"
 	"time"
@@ -82,7 +82,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 	customDescriptor.Handle = commsintconfig.ClientCharacteristicConfigHandle
 	characteristic.CCCD = customDescriptor
 
-	err = b.Client.Subscribe(characteristic, false, func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) })
+	err = b.Client.Subscribe(characteristic, false, b.parseResponse)
 	if err != nil {
 		if commsintconfig.DebugMode {
 			log.Printf("client_subscription_err|addr=%s|err=%s", b.Address, err)
@@ -92,9 +92,8 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 	defer b.Client.ClearSubscriptions()
 
 	// Handshake
-	log.Println("Handshaking")
+	log.Printf("Handshake initiated with %s (%s)", b.Name, b.Address)
 	b.Client.WriteCharacteristic(characteristic, []byte{commsintconfig.InitHandshakeSymbol}, true)
-	log.Println("Handshaking written")
 
 	// Read
 	for {
@@ -116,5 +115,59 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 				log.Printf("client_incoming_msg|addr=%s|msg=%s", b.Address, string(msg))
 			}
 		}
+	}
+}
+
+func (b *Bluno) parseResponse(resp []byte) {
+	data := stripWrappingBytes(resp)
+	if commsintconfig.DebugMode {
+		log.Printf("Received packet from bluno: [ % X ]\n", data)
+	}
+
+	if len(data) != commsintconfig.ExpectedPacketSize {
+		if commsintconfig.DebugMode {
+			log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(data), data)
+		}
+		return
+	}
+	p := constructPacket(data)
+	if commsintconfig.DebugMode {
+		log.Printf("Response parsed|%+v\n", p)
+	}
+
+	if p.Type == commsintconfig.Ack {
+		log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
+	}
+
+}
+
+// stripWrappingBytes removes leading and trailing bytes from incoming BLE packets
+func stripWrappingBytes(resp []byte) []byte {
+	return resp[commsintconfig.LeadingBytes : len(resp)-commsintconfig.TrailingBytes]
+}
+
+// determinePacketType returns the packet's type based on the first byte
+func determinePacketType(d []byte) commsintconfig.PacketType {
+	if d[0] == commsintconfig.RespHandshakeSymbol {
+		return commsintconfig.Ack
+	}
+	return commsintconfig.Data
+}
+
+// twoByteToNum converts 2 consecutive bytes into a uint16
+// it assumes the bytes are arranged in little endian format
+func twoByteToNum(d []byte, start uint8) uint16 {
+	return binary.LittleEndian.Uint16(d[start : start+2])
+}
+
+func constructPacket(resp []byte) commsintconfig.Packet {
+	return commsintconfig.Packet{
+		Type:  determinePacketType(resp),
+		X:     twoByteToNum(resp, 1),
+		Y:     twoByteToNum(resp, 3),
+		Z:     twoByteToNum(resp, 5),
+		Yaw:   twoByteToNum(resp, 7),
+		Pitch: twoByteToNum(resp, 9),
+		Roll:  twoByteToNum(resp, 11),
 	}
 }

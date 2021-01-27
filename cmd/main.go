@@ -42,7 +42,7 @@ func main() {
 		}(&b)
 	}
 
-	log.Println("Stop called")
+	log.Println("Waiting on goroutines...")
 	wg.Wait()
-	log.Println("Stop finalized")
+	log.Println("All goroutines finalized. Exiting...")
 }
