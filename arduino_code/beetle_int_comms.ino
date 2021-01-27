@@ -24,11 +24,6 @@ char* addIntToBuffer(char * start, uint16_t x) {
   return start;
 }
 
-
-// addAsChar writes a byte to a char
-
-
-
 // Expect fatigue level, etc. in the future
 char* addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t yaw, uint16_t pitch, uint16_t roll) {
   next = addIntToBuffer(next, x);
@@ -74,7 +69,7 @@ void setup() {
  
 void loop()
 {
-  if (Serial.available()) { //send what has been received
+  if (Serial.available()) {
     // Handshake from laptop
     if (Serial.read() == HANDSHAKE_INIT) {
       PrepareHandshakeAck(sendBuffer);
