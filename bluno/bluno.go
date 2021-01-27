@@ -129,8 +129,7 @@ func (b *Bluno) parseResponse(resp []byte) {
 		}
 		return
 	}
-	data := stripWrappingBytes(resp)
-	p := constructPacket(data)
+	p := constructPacket(resp)
 	if commsintconfig.DebugMode {
 		log.Printf("Response parsed|%+v\n", p)
 	}
@@ -139,11 +138,6 @@ func (b *Bluno) parseResponse(resp []byte) {
 		log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
 	}
 
-}
-
-// stripWrappingBytes removes leading and trailing bytes from incoming BLE packets
-func stripWrappingBytes(resp []byte) []byte {
-	return resp[commsintconfig.LeadingBytes:]
 }
 
 // determinePacketType returns the packet's type based on the first byte

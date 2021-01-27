@@ -1,12 +1,12 @@
 // Packet Specification
-#define PACKET_SIZE 18
+#define PACKET_SIZE 20
 
 // 65280 in decimal (FF00) onwards is reserved for protocol
-uint16_t val = 64000; //FFFE
+uint16_t val = 65535; //FFFE
 
 // Handshake constants
-byte HANDSHAKE_INIT = 'A';
-byte HANDSHAKE_RESPONSE = 'B';
+char HANDSHAKE_INIT = 'A';
+char HANDSHAKE_RESPONSE = 'B';
 
 // Buffer used to write to bluetooth
 char sendBuffer[PACKET_SIZE + 1]; 
@@ -42,12 +42,12 @@ char* addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t y
 
 // PrepareHandshakeAck prepares the buffer to respond to an incoming handshake request
 void PrepareHandshakeAck(char* buf) {
-  memset(buf, 0, PACKET_SIZE);
-  buf[0] = HANDSHAKE_RESPONSE;
+  memset(buf, '0', PACKET_SIZE);
+  *buf = HANDSHAKE_RESPONSE;
   char* done = addDataToBuffer(++buf, val, val-1, val-2, val-3, val-4, val-5);
 
   // Checksum
-  memset(done, 1, 1);
+  memset(done, '1', 1);
 }
 
 
@@ -65,8 +65,6 @@ void loop()
     if (Serial.read() == HANDSHAKE_INIT) {
       PrepareHandshakeAck(sendBuffer);
       Serial.write(sendBuffer, PACKET_SIZE);
-    } else {
-      Serial.write(Serial.read()); 
     }
   }
 }  
