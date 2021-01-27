@@ -107,7 +107,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 			log.Printf("exiting listen")
 			return false
 		case <-parentCtx.Done():
-		case <-time.After(10 * time.Second):
+		case <-time.After(20 * time.Second):
 			log.Printf("force exiting listen")
 			wg.Done()
 			return true
