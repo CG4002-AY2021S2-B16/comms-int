@@ -1,8 +1,7 @@
 // Packet Specification
 #define PACKET_SIZE 20
 
-// 65280 in decimal (FF00) onwards is reserved for protocol
-uint16_t val = 65535; //FFFE
+uint16_t val = 65535; //FFFF
 bool handshake_done = false;
 
 // Handshake constants
