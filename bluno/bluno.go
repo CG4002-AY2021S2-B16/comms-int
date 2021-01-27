@@ -93,8 +93,8 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 
 	// Handshake
 	log.Println("Handshaking")
-	b.Client.WriteCharacteristic(characteristic, []byte{'A', 'B', 'C'}, true)
-	log.Println("Handshaking done")
+	b.Client.WriteCharacteristic(characteristic, []byte{commsintconfig.InitHandshakeSymbol}, true)
+	log.Println("Handshaking written")
 
 	// Read
 	for {
