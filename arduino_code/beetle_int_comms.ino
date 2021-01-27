@@ -1,37 +1,42 @@
 // Packet Specification
-#define PACKET_SIZE 20
+#define PACKET_SIZE 18
 
-
-uint16_t val = 541; //0000 0010 0001 1101 -> 02 1D
+// 65280 in decimal (FF00) onwards is reserved for protocol
+uint16_t val = 64000; //FFFE
 
 // Handshake constants
 byte HANDSHAKE_INIT = 'A';
 byte HANDSHAKE_RESPONSE = 'B';
 
 // Buffer used to write to bluetooth
-char sendBuffer[PACKET_SIZE]; 
+char sendBuffer[PACKET_SIZE + 1]; 
 
 
 // addIntToBuffer writes an integer as 2 bytes to the buffer
-// It uses little endian e.g. 0x0A0B -> 0B 0A
+// It uses big endian e.g. 0x0A0B -> 0A 0B
 // returns next location after filling in 2 bytes
 char* addIntToBuffer(char * start, uint16_t x) {
-  *start = x;
+  *start = (x >> 8) & 0xFF;
   start++;
-  *start = x >> 8;
+  *start = x & 0xFF;
   start++;
   return start;
 }
 
 
+// addAsChar writes a byte to a char
+
+
+
 // Expect fatigue level, etc. in the future
-void addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t yaw, uint16_t roll, uint16_t pitch) {
+char* addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t yaw, uint16_t pitch, uint16_t roll) {
   next = addIntToBuffer(next, x);
   next = addIntToBuffer(next, y);
   next = addIntToBuffer(next, z);
   next = addIntToBuffer(next, yaw);
   next = addIntToBuffer(next, pitch);
   next = addIntToBuffer(next, roll);
+  return next;
 }
 
 
@@ -39,13 +44,16 @@ void addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t ya
 void PrepareHandshakeAck(char* buf) {
   memset(buf, 0, PACKET_SIZE);
   buf[0] = HANDSHAKE_RESPONSE;
-  addDataToBuffer(++buf, val, val+1, val+2, val+3, val+4, val+5);
+  char* done = addDataToBuffer(++buf, val, val-1, val-2, val-3, val-4, val-5);
+
+  // Checksum
+  memset(done, 1, 1);
 }
 
 
 void setup() {
-    Serial.begin(115200);
-    //pinMode(A0, INPUT);
+  sendBuffer[PACKET_SIZE] = '\0';
+  Serial.begin(115200);
 }
 
 
@@ -56,8 +64,9 @@ void loop()
     // Handshake from laptop
     if (Serial.read() == HANDSHAKE_INIT) {
       PrepareHandshakeAck(sendBuffer);
-      Serial.write(sendBuffer);
+      Serial.write(sendBuffer, PACKET_SIZE);
+    } else {
+      Serial.write(Serial.read()); 
     }
-    Serial.write(Serial.read());
   }
 }  

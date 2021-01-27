@@ -37,7 +37,7 @@ var LeadingBytes int = 2
 var TrailingBytes int = 1
 
 // ExpectedPacketSize refers to the number of useful bytes of data within an incoming packet
-var ExpectedPacketSize int = 13
+var ExpectedPacketSize int = 20
 
 // PacketType is an enum type which signifies the type of packet received from the Bluno
 type PacketType uint8

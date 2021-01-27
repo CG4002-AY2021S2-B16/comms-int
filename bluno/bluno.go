@@ -119,17 +119,17 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 }
 
 func (b *Bluno) parseResponse(resp []byte) {
-	data := stripWrappingBytes(resp)
 	if commsintconfig.DebugMode {
-		log.Printf("Received packet from bluno: [ % X ]\n", data)
+		log.Printf("Received packet from bluno: [ % X ]\n", resp)
 	}
 
-	if len(data) != commsintconfig.ExpectedPacketSize {
+	if len(resp) != commsintconfig.ExpectedPacketSize {
 		if commsintconfig.DebugMode {
-			log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(data), data)
+			log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(resp), resp)
 		}
 		return
 	}
+	data := stripWrappingBytes(resp)
 	p := constructPacket(data)
 	if commsintconfig.DebugMode {
 		log.Printf("Response parsed|%+v\n", p)
@@ -143,7 +143,7 @@ func (b *Bluno) parseResponse(resp []byte) {
 
 // stripWrappingBytes removes leading and trailing bytes from incoming BLE packets
 func stripWrappingBytes(resp []byte) []byte {
-	return resp[commsintconfig.LeadingBytes : len(resp)-commsintconfig.TrailingBytes]
+	return resp[commsintconfig.LeadingBytes:]
 }
 
 // determinePacketType returns the packet's type based on the first byte
@@ -157,7 +157,7 @@ func determinePacketType(d []byte) commsintconfig.PacketType {
 // twoByteToNum converts 2 consecutive bytes into a uint16
 // it assumes the bytes are arranged in little endian format
 func twoByteToNum(d []byte, start uint8) uint16 {
-	return binary.LittleEndian.Uint16(d[start : start+2])
+	return binary.BigEndian.Uint16(d[start : start+2])
 }
 
 func constructPacket(resp []byte) commsintconfig.Packet {
