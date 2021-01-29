@@ -1,6 +1,7 @@
 package bluno
 
 import (
+	"container/list"
 	"context"
 	"encoding/binary"
 	"log"
@@ -20,7 +21,9 @@ type Bluno struct {
 	PacketsReceived        uint32     `json:"packets_received"`
 	PacketsInvalidType     uint32     `json:"packets_invalid_type"`
 	PacketsIncorrectLength uint32     `json:"packets_incorrect_length"`
+	PacketsReconciled      uint32     `json:"packets_reconciled"`
 	StartTime              time.Time  `json:"start_time"`
+	Buffer                 *list.List `json:"response_buffer"`
 }
 
 // DefaultTimeout is the timeout for establishing connection
@@ -134,14 +137,19 @@ func (b *Bluno) parseResponse(resp []byte) {
 		log.Printf("Received packet from bluno: [ % X ]\n", resp)
 	}
 
+	var p commsintconfig.Packet
+
 	if len(resp) != commsintconfig.ExpectedPacketSize {
+		b.PacketsIncorrectLength++
 		if commsintconfig.DebugMode {
 			log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(resp), resp)
 		}
-		b.PacketsIncorrectLength++
+		//p = b.ReconcilePacket(resp)
 		return
+	} else {
+		p = constructPacket(resp)
 	}
-	p := constructPacket(resp)
+
 	if commsintconfig.DebugMode {
 		log.Printf("Response parsed|%+v\n", p)
 	}
@@ -191,13 +199,41 @@ func constructPacket(resp []byte) commsintconfig.Packet {
 func (b *Bluno) PrintStats() {
 	successfulPackets := float64(b.PacketsReceived - b.PacketsIncorrectLength - b.PacketsInvalidType)
 	elapsedTime := time.Now().Sub(b.StartTime).Seconds()
-	log.Printf("print_stats|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f", successfulPackets, elapsedTime, successfulPackets/elapsedTime)
+
 	log.Printf(
-		"print_stats|success_ratio=%f|irrecoverable_incorrect_length_ratio=%f|invalid_data_ratio=%f",
+		"print_stats|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f",
+		successfulPackets,
+		elapsedTime,
+		successfulPackets/elapsedTime,
+	)
+	log.Printf(
+		"print_stats|success_ratio=%f|incorrect_length_ratio=%f|invalid_data_ratio=%f",
 		successfulPackets/float64(b.PacketsReceived),
 		float64(b.PacketsIncorrectLength)/float64(b.PacketsReceived),
 		float64(b.PacketsInvalidType)/float64(b.PacketsReceived),
 	)
+
+	// Account for reconciliation
+	// Reconciliation causes extra 1 InvalidType, 1 IncorrectLength and 1 PacketReceived
+	adjIncorrectLength := float64(b.PacketsIncorrectLength - b.PacketsReconciled)
+	adjInvalidType := float64(b.PacketsInvalidType - b.PacketsReconciled)
+	adjPacketsReceived := float64(b.PacketsReceived - b.PacketsReconciled)
+	adjSuccessfulPackets := adjPacketsReceived - adjInvalidType - adjIncorrectLength
+
+	log.Printf(
+		"print_stats_post_reconciliation|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f",
+		adjSuccessfulPackets,
+		elapsedTime,
+		adjSuccessfulPackets/elapsedTime,
+	)
+
+	log.Printf(
+		"print_stats_post_reconciliation|success_ratio=%f|incorrect_length_ratio=%f|invalid_data_ratio=%f",
+		adjSuccessfulPackets/float64(adjPacketsReceived),
+		float64(adjIncorrectLength)/float64(adjPacketsReceived),
+		float64(adjInvalidType)/float64(adjPacketsReceived),
+	)
+
 }
 
 // SetClient attaches an active client to the given bluno, and resets its statistics e.g. transmission counters
@@ -207,4 +243,5 @@ func (b *Bluno) SetClient(c *ble.Client) {
 	b.PacketsIncorrectLength = 0
 	b.PacketsReceived = 0
 	b.StartTime = time.Now()
+	b.Buffer = list.New()
 }
