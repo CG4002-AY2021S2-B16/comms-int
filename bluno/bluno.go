@@ -13,13 +13,14 @@ import (
 
 // Bluno represents a BLE device
 type Bluno struct {
-	Address            string     `json:"address"`
-	Name               string     `json:"name"`
-	Client             ble.Client `json:"client"`
-	ConnectionPriority uint8      `json:"connection_priority"`
-	PacketsReceived    uint32     `json:"packets_received"`
-	PacketsFailed      uint32     `json:"packets_failed"`
-	StartTime          time.Time  `json:"start_time"`
+	Address                string     `json:"address"`
+	Name                   string     `json:"name"`
+	Client                 ble.Client `json:"client"`
+	ConnectionPriority     uint8      `json:"connection_priority"`
+	PacketsReceived        uint32     `json:"packets_received"`
+	PacketsInvalidType     uint32     `json:"packets_invalid_type"`
+	PacketsIncorrectLength uint32     `json:"packets_incorrect_length"`
+	StartTime              time.Time  `json:"start_time"`
 }
 
 // DefaultTimeout is the timeout for establishing connection
@@ -110,12 +111,12 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 		select {
 		case <-b.Client.Disconnected():
 		case <-errorCh:
-			log.Printf("client_connection_terminated|force=false|packets received=%d, packets_failed=%d", b.PacketsReceived, b.PacketsFailed)
+			log.Printf("client_connection_terminated|force=false|packets received=%d", b.PacketsReceived)
 			b.PrintStats()
 			return false
 		case <-parentCtx.Done():
 		case <-time.After(ConnectionTimeout):
-			log.Printf("client_connection_terminated|force=true|packets received=%d, packets_failed=%d", b.PacketsReceived, b.PacketsFailed)
+			log.Printf("client_connection_terminated|force=true|packets received=%d", b.PacketsReceived)
 			b.PrintStats()
 			wg.Done()
 			return true
@@ -137,7 +138,7 @@ func (b *Bluno) parseResponse(resp []byte) {
 		if commsintconfig.DebugMode {
 			log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(resp), resp)
 		}
-		b.PacketsFailed++
+		b.PacketsIncorrectLength++
 		return
 	}
 	p := constructPacket(resp)
@@ -150,7 +151,7 @@ func (b *Bluno) parseResponse(resp []byte) {
 	}
 
 	if p.Type == commsintconfig.Invalid {
-		b.PacketsFailed++
+		b.PacketsInvalidType++
 	}
 
 }
@@ -188,15 +189,22 @@ func constructPacket(resp []byte) commsintconfig.Packet {
 // -> implies each packet is between 248 - 328 bits
 // -> implies up to 351 - 464 packets can be received per second
 func (b *Bluno) PrintStats() {
-	successfulPackets := float64(b.PacketsReceived - b.PacketsFailed)
+	successfulPackets := float64(b.PacketsReceived - b.PacketsIncorrectLength - b.PacketsInvalidType)
 	elapsedTime := time.Now().Sub(b.StartTime).Seconds()
-	log.Printf("client_connection_terminated|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f", successfulPackets, elapsedTime, successfulPackets/elapsedTime)
+	log.Printf("print_stats|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f", successfulPackets, elapsedTime, successfulPackets/elapsedTime)
+	log.Printf(
+		"print_stats|success_ratio=%f|irrecoverable_incorrect_length_ratio=%f|invalid_data_ratio=%f",
+		successfulPackets/float64(b.PacketsReceived),
+		float64(b.PacketsIncorrectLength)/float64(b.PacketsReceived),
+		float64(b.PacketsInvalidType)/float64(b.PacketsReceived),
+	)
 }
 
 // SetClient attaches an active client to the given bluno, and resets its statistics e.g. transmission counters
 func (b *Bluno) SetClient(c *ble.Client) {
 	b.Client = *c
-	b.PacketsFailed = 0
+	b.PacketsInvalidType = 0
+	b.PacketsIncorrectLength = 0
 	b.PacketsReceived = 0
 	b.StartTime = time.Now()
 }
