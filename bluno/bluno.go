@@ -17,10 +17,17 @@ type Bluno struct {
 	Name               string     `json:"name"`
 	Client             ble.Client `json:"client"`
 	ConnectionPriority uint8      `json:"connection_priority"`
+	PacketsReceived    uint32     `json:"packets_received"`
+	PacketsFailed      uint32     `json:"packets_failed"`
+	StartTime          time.Time  `json:"start_time"`
 }
 
-// DefaultTimeout is the timeout used per connection
+// DefaultTimeout is the timeout for establishing connection
 const DefaultTimeout time.Duration = 1 * time.Second
+
+// ConnectionTimeout is the timeout/duration for an active connection
+// Should equal infinity in non-testing use
+const ConnectionTimeout = 20 * time.Second
 
 // Connect establishes a connection with the physical bluno
 // - Remember to close client when done
@@ -43,7 +50,7 @@ func (b *Bluno) Connect() bool {
 		log.Printf("client_connection_succeeded|addr=%s", b.Address)
 	}
 
-	b.Client = client
+	b.SetClient(&client)
 	return true
 }
 
@@ -103,11 +110,13 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 		select {
 		case <-b.Client.Disconnected():
 		case <-errorCh:
-			log.Printf("exiting listen")
+			log.Printf("client_connection_terminated|force=false|packets received=%d, packets_failed=%d", b.PacketsReceived, b.PacketsFailed)
+			b.PrintStats()
 			return false
 		case <-parentCtx.Done():
-		case <-time.After(20 * time.Second):
-			log.Printf("force exiting listen")
+		case <-time.After(ConnectionTimeout):
+			log.Printf("client_connection_terminated|force=true|packets received=%d, packets_failed=%d", b.PacketsReceived, b.PacketsFailed)
+			b.PrintStats()
 			wg.Done()
 			return true
 		case msg := <-msgCh:
@@ -119,6 +128,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 }
 
 func (b *Bluno) parseResponse(resp []byte) {
+	b.PacketsReceived++
 	if commsintconfig.DebugMode {
 		log.Printf("Received packet from bluno: [ % X ]\n", resp)
 	}
@@ -127,6 +137,7 @@ func (b *Bluno) parseResponse(resp []byte) {
 		if commsintconfig.DebugMode {
 			log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(resp), resp)
 		}
+		b.PacketsFailed++
 		return
 	}
 	p := constructPacket(resp)
@@ -136,6 +147,10 @@ func (b *Bluno) parseResponse(resp []byte) {
 
 	if p.Type == commsintconfig.Ack {
 		log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
+	}
+
+	if p.Type == commsintconfig.Invalid {
+		b.PacketsFailed++
 	}
 
 }
@@ -166,4 +181,22 @@ func constructPacket(resp []byte) commsintconfig.Packet {
 		Pitch: twoByteToNum(resp, 9),
 		Roll:  twoByteToNum(resp, 11),
 	}
+}
+
+// PrintStats prints out transmission statistics for a given bluno
+// Each BLE 4.0 packet is between 31 (best) - 41 (worst case) bytes
+// -> implies each packet is between 248 - 328 bits
+// -> implies up to 351 - 464 packets can be received per second
+func (b *Bluno) PrintStats() {
+	successfulPackets := float64(b.PacketsReceived - b.PacketsFailed)
+	elapsedTime := time.Now().Sub(b.StartTime).Seconds()
+	log.Printf("client_connection_terminated|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f", successfulPackets, elapsedTime, successfulPackets/elapsedTime)
+}
+
+// SetClient attaches an active client to the given bluno, and resets its statistics e.g. transmission counters
+func (b *Bluno) SetClient(c *ble.Client) {
+	b.Client = *c
+	b.PacketsFailed = 0
+	b.PacketsReceived = 0
+	b.StartTime = time.Now()
 }
