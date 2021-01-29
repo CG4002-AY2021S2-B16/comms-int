@@ -19,6 +19,7 @@ type Bluno struct {
 	Client                 ble.Client `json:"client"`
 	ConnectionPriority     uint8      `json:"connection_priority"`
 	PacketsReceived        uint32     `json:"packets_received"`
+	PacketsImmSuccess      uint32     `json:"packets_immediate_success"`
 	PacketsInvalidType     uint32     `json:"packets_invalid_type"`
 	PacketsIncorrectLength uint32     `json:"packets_incorrect_length"`
 	PacketsReconciled      uint32     `json:"packets_reconciled"`
@@ -137,15 +138,21 @@ func (b *Bluno) parseResponse(resp []byte) {
 		log.Printf("Received packet from bluno: [ % X ]\n", resp)
 	}
 
-	var p commsintconfig.Packet
+	var p commsintconfig.Packet = commsintconfig.Packet{Type: commsintconfig.Invalid}
 
 	if len(resp) != commsintconfig.ExpectedPacketSize {
 		b.PacketsIncorrectLength++
 		if commsintconfig.DebugMode {
 			log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(resp), resp)
 		}
-		//p = b.ReconcilePacket(resp)
-		return
+		// return // discard
+
+		var reconciled bool
+		p, reconciled = b.ReconcilePacket(resp)
+		if !reconciled {
+			return
+		}
+		b.PacketsReconciled++
 	} else {
 		p = constructPacket(resp)
 	}
@@ -154,12 +161,13 @@ func (b *Bluno) parseResponse(resp []byte) {
 		log.Printf("Response parsed|%+v\n", p)
 	}
 
-	if p.Type == commsintconfig.Ack {
+	switch p.Type {
+	case commsintconfig.Ack:
 		log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
-	}
-
-	if p.Type == commsintconfig.Invalid {
+	case commsintconfig.Invalid:
 		b.PacketsInvalidType++
+	default:
+		b.PacketsImmSuccess++
 	}
 
 }
@@ -197,28 +205,33 @@ func constructPacket(resp []byte) commsintconfig.Packet {
 // -> implies each packet is between 248 - 328 bits
 // -> implies up to 351 - 464 packets can be received per second
 func (b *Bluno) PrintStats() {
-	successfulPackets := float64(b.PacketsReceived - b.PacketsIncorrectLength - b.PacketsInvalidType)
 	elapsedTime := time.Now().Sub(b.StartTime).Seconds()
-
 	log.Printf(
-		"print_stats|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f",
-		successfulPackets,
+		"print_stats_pre_reconciliation|successful_packets=%d|elapsed_time=%f|effective_packets_per_second=%f",
+		b.PacketsImmSuccess,
 		elapsedTime,
-		successfulPackets/elapsedTime,
+		float64(b.PacketsImmSuccess)/elapsedTime,
 	)
 	log.Printf(
-		"print_stats|success_ratio=%f|incorrect_length_ratio=%f|invalid_data_ratio=%f",
-		successfulPackets/float64(b.PacketsReceived),
+		"print_stats_pre_reconciliation|success_ratio=%f|incorrect_length_ratio=%f|invalid_data_ratio=%f",
+		float64(b.PacketsImmSuccess)/float64(b.PacketsReceived),
 		float64(b.PacketsIncorrectLength)/float64(b.PacketsReceived),
 		float64(b.PacketsInvalidType)/float64(b.PacketsReceived),
 	)
 
-	// Account for reconciliation
+	// Print absolute numbers
+	log.Printf(
+		"print_stats_post_reconciliation|packets_received=%d|immediately_successful_packets=%d|reconciled_packets=%d|invalid_packets=%d|incorrect_length_packets=%d",
+		b.PacketsReceived,
+		b.PacketsImmSuccess,
+		b.PacketsReconciled,
+		b.PacketsInvalidType,
+		b.PacketsIncorrectLength,
+	)
+
 	// Reconciliation causes extra 1 InvalidType, 1 IncorrectLength and 1 PacketReceived
-	adjIncorrectLength := float64(b.PacketsIncorrectLength - b.PacketsReconciled)
-	adjInvalidType := float64(b.PacketsInvalidType - b.PacketsReconciled)
-	adjPacketsReceived := float64(b.PacketsReceived - b.PacketsReconciled)
-	adjSuccessfulPackets := adjPacketsReceived - adjInvalidType - adjIncorrectLength
+	adjIncorrectLength := float64(b.PacketsIncorrectLength - 2*b.PacketsReconciled)
+	adjSuccessfulPackets := float64(b.PacketsImmSuccess + b.PacketsReconciled)
 
 	log.Printf(
 		"print_stats_post_reconciliation|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f",
@@ -229,9 +242,9 @@ func (b *Bluno) PrintStats() {
 
 	log.Printf(
 		"print_stats_post_reconciliation|success_ratio=%f|incorrect_length_ratio=%f|invalid_data_ratio=%f",
-		adjSuccessfulPackets/float64(adjPacketsReceived),
-		float64(adjIncorrectLength)/float64(adjPacketsReceived),
-		float64(adjInvalidType)/float64(adjPacketsReceived),
+		adjSuccessfulPackets/float64(b.PacketsReceived),
+		float64(adjIncorrectLength)/float64(b.PacketsReceived),
+		float64(b.PacketsInvalidType)/float64(b.PacketsReceived),
 	)
 
 }
