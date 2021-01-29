@@ -19,7 +19,7 @@ func (b *Bluno) ReconcilePacket(curr []byte) (commsintconfig.Packet, bool) {
 			}
 			return constructPacket(append(prev, curr...)), true
 		}
-		//b.Buffer.PushBack(prev)
+		b.Buffer.PushBack(prev)
 	}
 	// Otherwise if the packet appears to be valid, it is likely spliced into 2 pieces
 	// Add to buffer if it appears that the currently considered packet can be the first one
