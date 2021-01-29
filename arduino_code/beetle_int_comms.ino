@@ -1,8 +1,7 @@
 // Packet Specification
 #define PACKET_SIZE 20
 
-// 65280 in decimal (FF00) onwards is reserved for protocol
-uint16_t val = 65535; //FFFE
+uint16_t val = 65535; //FFFF
 bool handshake_done = false;
 
 // Handshake constants
@@ -24,11 +23,6 @@ char* addIntToBuffer(char * start, uint16_t x) {
   start++;
   return start;
 }
-
-
-// addAsChar writes a byte to a char
-
-
 
 // Expect fatigue level, etc. in the future
 char* addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t yaw, uint16_t pitch, uint16_t roll) {
@@ -75,7 +69,7 @@ void setup() {
  
 void loop()
 {
-  if (Serial.available()) { //send what has been received
+  if (Serial.available()) {
     // Handshake from laptop
     if (Serial.read() == HANDSHAKE_INIT) {
       PrepareHandshakeAck(sendBuffer);
