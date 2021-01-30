@@ -1,5 +1,7 @@
 package commsintconfig
 
+import "time"
+
 // DebugMode enables debug log messages
 var DebugMode bool = true
 
@@ -58,3 +60,11 @@ type Packet struct {
 	Pitch uint16
 	Roll  uint16
 }
+
+// Connection timeout parameters
+
+// ConnectionEstablishTimeout is the timeout for establishing connection
+var ConnectionEstablishTimeout time.Duration = 1 * time.Second
+
+// ConnectionLivenessTimeout is the timeout after which reconnection is attempted
+var ConnectionLivenessTimeout time.Duration = 2000 * time.Millisecond

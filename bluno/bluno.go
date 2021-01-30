@@ -17,8 +17,9 @@ type Bluno struct {
 	Address                string     `json:"address"`
 	Name                   string     `json:"name"`
 	Client                 ble.Client `json:"client"`
-	ConnectionPriority     uint8      `json:"connection_priority"`
 	PacketsReceived        uint32     `json:"packets_received"`
+	HandshakeAcknowledged  bool       `json:"handshake_acknowledged"`
+	LastPacketReceivedAt   time.Time  `json:"last_packet_received_at"`
 	PacketsImmSuccess      uint32     `json:"packets_immediate_success"`
 	PacketsInvalidType     uint32     `json:"packets_invalid_type"`
 	PacketsIncorrectLength uint32     `json:"packets_incorrect_length"`
@@ -26,13 +27,6 @@ type Bluno struct {
 	StartTime              time.Time  `json:"start_time"`
 	Buffer                 *list.List `json:"response_buffer"`
 }
-
-// DefaultTimeout is the timeout for establishing connection
-const DefaultTimeout time.Duration = 1 * time.Second
-
-// ConnectionTimeout is the timeout/duration for an active connection
-// Should equal infinity in non-testing use
-const ConnectionTimeout = 20 * time.Second
 
 // Connect establishes a connection with the physical bluno
 // - Remember to close client when done
@@ -42,7 +36,7 @@ func (b *Bluno) Connect() bool {
 	// Create a context that times out after 1 second
 	ctx := ble.WithSigHandler(context.WithTimeout(
 		context.Background(),
-		DefaultTimeout,
+		commsintconfig.ConnectionEstablishTimeout,
 	))
 	client, err := ble.Dial(ctx, ble.NewAddr(b.Address))
 	if err != nil {
@@ -107,27 +101,29 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 	log.Printf("Handshake initiated with %s (%s)", b.Name, b.Address)
 	b.Client.WriteCharacteristic(characteristic, []byte{commsintconfig.InitHandshakeSymbol}, true)
 
+	// Start ticker
+	tickChan := time.NewTicker(commsintconfig.ConnectionLivenessTimeout)
+
 	// Read
 	for {
-		msgCh := make(chan []byte, 1)
-		errorCh := make(chan bool, 1)
-
 		select {
 		case <-b.Client.Disconnected():
-		case <-errorCh:
-			log.Printf("client_connection_terminated|force=false|packets received=%d", b.PacketsReceived)
+			log.Println("client_connection_disconnected")
 			b.PrintStats()
 			return false
+		case t := <-tickChan.C:
+			log.Printf("client_connection_terminated|ticker_exceed|packets received=%d", b.PacketsReceived)
+			if b.HandshakeAcknowledged {
+				b.PrintStats()
+			}
+			if t.Sub(b.LastPacketReceivedAt) >= commsintconfig.ConnectionLivenessTimeout {
+				return false
+			}
 		case <-parentCtx.Done():
-		case <-time.After(ConnectionTimeout):
 			log.Printf("client_connection_terminated|force=true|packets received=%d", b.PacketsReceived)
 			b.PrintStats()
 			wg.Done()
 			return true
-		case msg := <-msgCh:
-			if commsintconfig.DebugMode {
-				log.Printf("client_incoming_msg|addr=%s|msg=%s", b.Address, string(msg))
-			}
 		}
 	}
 }
@@ -164,10 +160,19 @@ func (b *Bluno) parseResponse(resp []byte) {
 	switch p.Type {
 	case commsintconfig.Ack:
 		log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
+		b.LastPacketReceivedAt = time.Now()
+		b.HandshakeAcknowledged = true
 	case commsintconfig.Invalid:
 		b.PacketsInvalidType++
 	default:
-		b.PacketsImmSuccess++
+		if b.HandshakeAcknowledged == false {
+			b.PacketsInvalidType++
+		} else {
+			b.PacketsImmSuccess++
+			b.LastPacketReceivedAt = time.Now()
+			// Send to output buffer
+		}
+
 	}
 
 }
