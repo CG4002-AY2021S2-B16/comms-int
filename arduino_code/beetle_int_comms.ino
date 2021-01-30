@@ -1,7 +1,8 @@
 // Packet Specification
 #define PACKET_SIZE 20
 
-uint16_t val = 65535; //FFFF
+// 65280 in decimal (FF00) onwards is reserved for protocol
+uint16_t val = 65535; //FFFE
 bool handshake_done = false;
 
 // Handshake constants
@@ -23,6 +24,11 @@ char* addIntToBuffer(char * start, uint16_t x) {
   start++;
   return start;
 }
+
+
+// addAsChar writes a byte to a char
+
+
 
 // Expect fatigue level, etc. in the future
 char* addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t yaw, uint16_t pitch, uint16_t roll) {
@@ -61,25 +67,32 @@ void PrepareDataPacket(char* buf) {
 
 
 void setup() {
-  sendBuffer[PACKET_SIZE] = '\0';
+  handshake_done = false;
   Serial.begin(115200);
+  sendBuffer[PACKET_SIZE] = '\0';
 }
 
 
  
-void loop()
-{
-  if (Serial.available()) {
-    // Handshake from laptop
-    if (Serial.read() == HANDSHAKE_INIT) {
+void loop(){
+  // Handshake from laptop
+  if (Serial.available() > 0) {
+    char incomingByte = Serial.read();
+    if (incomingByte == HANDSHAKE_INIT) {
       PrepareHandshakeAck(sendBuffer);
       Serial.write(sendBuffer, PACKET_SIZE);
       handshake_done = true;
-    } 
+    } else {
+      // Clear input/output buffer
+      Serial.flush();
+      while (Serial.available() > 0) {
+        Serial.read();
+      }
+    }
   }
   else if (handshake_done) {
-      PrepareDataPacket(sendBuffer);
-      Serial.write(sendBuffer, PACKET_SIZE);
-      delay(5); // Seems to give 140 correct packets/sec (20 bytes of usable data each), we use this as baseline. Theoretical limit is around 350 packets/sec at 115200 bps
+    PrepareDataPacket(sendBuffer);
+    Serial.write(sendBuffer, PACKET_SIZE);
+    delay(7); // Seems to give 140 correct packets/sec (20 bytes of usable data each), we use this as baseline. Theoretical limit is around 350 packets/sec at 115200 bps
   }
 }  

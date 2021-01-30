@@ -102,7 +102,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 	b.Client.WriteCharacteristic(characteristic, []byte{commsintconfig.InitHandshakeSymbol}, true)
 
 	// Start ticker
-	tickChan := time.NewTicker(commsintconfig.ConnectionLivenessTimeout)
+	tickChan := time.NewTicker(commsintconfig.ConnectionLivenessCheckInterval)
 
 	// Read
 	for {
@@ -112,11 +112,23 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 			b.PrintStats()
 			return false
 		case t := <-tickChan.C:
-			log.Printf("client_connection_terminated|ticker_exceed|packets received=%d", b.PacketsReceived)
-			if b.HandshakeAcknowledged {
+			diff := t.Sub(b.LastPacketReceivedAt)
+			if b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionLivenessTimeout {
 				b.PrintStats()
-			}
-			if t.Sub(b.LastPacketReceivedAt) >= commsintconfig.ConnectionLivenessTimeout {
+				log.Printf(
+					"client_connection_terminated|ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
+					b.PacketsReceived,
+					b.LastPacketReceivedAt,
+					t,
+				)
+				return false
+			} else if !b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionEstablishTimeout {
+				log.Printf(
+					"client_connection_terminated|ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
+					b.PacketsReceived,
+					b.LastPacketReceivedAt,
+					t,
+				)
 				return false
 			}
 		case <-parentCtx.Done():
@@ -129,6 +141,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 }
 
 func (b *Bluno) parseResponse(resp []byte) {
+	b.LastPacketReceivedAt = time.Now()
 	b.PacketsReceived++
 	if commsintconfig.DebugMode {
 		log.Printf("Received packet from bluno: [ % X ]\n", resp)
@@ -160,7 +173,6 @@ func (b *Bluno) parseResponse(resp []byte) {
 	switch p.Type {
 	case commsintconfig.Ack:
 		log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
-		b.LastPacketReceivedAt = time.Now()
 		b.HandshakeAcknowledged = true
 	case commsintconfig.Invalid:
 		b.PacketsInvalidType++
@@ -169,7 +181,6 @@ func (b *Bluno) parseResponse(resp []byte) {
 			b.PacketsInvalidType++
 		} else {
 			b.PacketsImmSuccess++
-			b.LastPacketReceivedAt = time.Now()
 			// Send to output buffer
 		}
 
@@ -260,6 +271,10 @@ func (b *Bluno) SetClient(c *ble.Client) {
 	b.PacketsInvalidType = 0
 	b.PacketsIncorrectLength = 0
 	b.PacketsReceived = 0
+	b.PacketsImmSuccess = 0
+	b.PacketsReconciled = 0
+	b.HandshakeAcknowledged = false
 	b.StartTime = time.Now()
+	b.LastPacketReceivedAt = time.Now()
 	b.Buffer = list.New()
 }
