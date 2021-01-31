@@ -24,7 +24,7 @@ type IOHandler struct {
 
 // Instruction is an incoming message from upstream
 type Instruction struct {
-	Cmd int32 `json:"cmd"`
+	Cmd string `json:"cmd"`
 }
 
 // NewUpstreamConnection creates and returns a new wrapper for input and output sockets
@@ -56,6 +56,7 @@ func NewUpstreamConnection() *IOHandler {
 		defer outgoingListener.Close()
 		for {
 			outgoing, err := outgoingListener.Accept()
+			log.Printf("upstream|outgoing_listener_accept")
 			if err != nil {
 				log.Printf("upstream|outgoing_listener_accept|err=%s", err)
 				return
@@ -69,6 +70,7 @@ func NewUpstreamConnection() *IOHandler {
 
 		for {
 			incoming, err := incomingListener.Accept()
+			log.Printf("upstream|incoming_listener_accept")
 			if err != nil {
 				log.Printf("upstream|incoming_listener_accept|err=%s", err)
 				return
@@ -105,21 +107,22 @@ func writeRoutine(oConn net.Conn, comm chan commsintconfig.Packet) {
 // out to the main application via the provided channel
 func readRoutine(iConn net.Conn, comm chan string) {
 	iConn.SetReadDeadline(time.Time{}) // Set to zero (no timeout)
-	var b []byte
-	var i *Instruction
+	var i Instruction
+	b := make([]byte, constants.UpstreamNotifBufferSize)
 
 	for {
-		_, err := iConn.Read(b)
+		num, err := iConn.Read(b)
+		log.Printf("upstream|read_routine|string=%s", string(b))
 		if err != nil {
 			log.Printf("upstream|read_routine|err=%s", err)
 			return
 		}
 
-		err = json.Unmarshal(b, i)
+		err = json.Unmarshal(b[:num], &i)
 		if err != nil {
-			log.Printf("upstream|read_routine_unmarshal|err=%s", err)
+			log.Printf("upstream|read_routine_unmarshal|err=%s|data=%s", err, string(b))
 		} else {
-			comm <- string(b)
+			comm <- i.Cmd
 		}
 	}
 }

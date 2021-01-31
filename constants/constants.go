@@ -23,6 +23,9 @@ var UpstreamResumeMsg string = "resume"
 // UpstreamPauseMsg is the expected indication to pause the application
 var UpstreamPauseMsg string = "pause"
 
+// UpstreamNotifBufferSize refers to the max number of bytes to be read in for an incoming notif
+var UpstreamNotifBufferSize int = 1000
+
 // Bluno configurations
 var blunoOne bluno.Bluno = bluno.Bluno{
 	Address: "80:30:DC:E9:1C:34",

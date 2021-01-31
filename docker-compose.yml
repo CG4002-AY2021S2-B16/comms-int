@@ -9,3 +9,8 @@ services:
     privileged: true
     volumes: 
       - ./sockets:/tmp/www/comms/
+  python_controller:
+    build:
+      context: ./supporting_scripts
+    volumes: 
+      - ./sockets:/tmp/www/comms/
