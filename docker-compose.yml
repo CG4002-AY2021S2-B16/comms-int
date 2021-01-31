@@ -7,3 +7,5 @@ services:
     restart: on-failure
     network_mode: host
     privileged: true
+    volumes: 
+      - ./sockets:/tmp/www/comms/

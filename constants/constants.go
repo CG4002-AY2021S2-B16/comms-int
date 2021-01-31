@@ -1,8 +1,27 @@
 package constants
 
 import (
+	"time"
+
 	"github.com/CG4002-AY2021S2-B16/comms-int/bluno"
 )
+
+// IncomingNotifSock refers to the unix socket's pathname used for notifications
+// This needs to be mapped to a suitable location outside of the container
+var IncomingNotifSock string = "/tmp/www/comms/notif.sock"
+
+// OutgoingDataSock refers to the unix socket's pathname used for sending outgoing data
+// This needs to be mapped to a suitable location outside of the container
+var OutgoingDataSock string = "/tmp/www/comms/data.sock"
+
+// UpstreamCheckFreq decides how often upstream is checked for incoming messages
+var UpstreamCheckFreq time.Duration = 300 * time.Millisecond
+
+// UpstreamResumeMsg is the expected indication to resume the application
+var UpstreamResumeMsg string = "resume"
+
+// UpstreamPauseMsg is the expected indication to pause the application
+var UpstreamPauseMsg string = "pause"
 
 // Bluno configurations
 var blunoOne bluno.Bluno = bluno.Bluno{

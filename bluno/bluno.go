@@ -32,12 +32,14 @@ type Bluno struct {
 // - Remember to close client when done
 // - Remember to check disconnected before interacting with channel
 // - To be run inside a goroutine
-func (b *Bluno) Connect() bool {
+func (b *Bluno) Connect(pCtx context.Context) bool {
 	// Create a context that times out after 1 second
-	ctx := ble.WithSigHandler(context.WithTimeout(
-		context.Background(),
+	ctx, cancel := context.WithTimeout(
+		pCtx,
 		commsintconfig.ConnectionEstablishTimeout,
-	))
+	)
+	defer cancel()
+
 	client, err := ble.Dial(ctx, ble.NewAddr(b.Address))
 	if err != nil {
 		if commsintconfig.DebugMode {
@@ -55,11 +57,8 @@ func (b *Bluno) Connect() bool {
 
 // Listen receives incoming connections from bluno
 // - to be called inside a goroutine
-func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
+func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup) bool {
 	defer b.Client.CancelConnection()
-
-	// Create a context that is sensitive to kill signal
-	parentCtx := ble.WithSigHandler(context.WithCancel(context.Background()))
 
 	svcUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoServiceReducedUUID), ble.MustParse(commsintconfig.BlunoServiceUUID)}
 	charUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoCharacteristicReducedUUID), ble.MustParse(commsintconfig.BlunoCharacteristicUUID)}
@@ -131,7 +130,7 @@ func (b *Bluno) Listen(wg *sync.WaitGroup) bool {
 				)
 				return false
 			}
-		case <-parentCtx.Done():
+		case <-pCtx.Done():
 			log.Printf("client_connection_terminated|force=true|packets received=%d", b.PacketsReceived)
 			b.PrintStats()
 			wg.Done()

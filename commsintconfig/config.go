@@ -53,12 +53,12 @@ const (
 // Packet is constructed from a complete bluetooth response
 type Packet struct {
 	Type  PacketType
-	X     uint16
-	Y     uint16
-	Z     uint16
-	Yaw   uint16
-	Pitch uint16
-	Roll  uint16
+	X     uint16 `json:"x"`
+	Y     uint16 `json:"y"`
+	Z     uint16 `json:"z"`
+	Yaw   uint16 `json:"yaw"`
+	Pitch uint16 `json:"pitch"`
+	Roll  uint16 `json:"roll"`
 }
 
 // Connection timeout parameters
@@ -71,3 +71,13 @@ var ConnectionLivenessCheckInterval time.Duration = 40 * time.Millisecond
 
 // ConnectionLivenessTimeout is the max leeway, after which reconnection is attempted
 var ConnectionLivenessTimeout time.Duration = 200 * time.Millisecond
+
+// State indicates current program status
+type State int
+
+const (
+	// Waiting refers to an idling application that is waiting on a message queue start signal
+	Waiting State = 1
+	// Running refers to a running application that is interacting with blunos and writing to output
+	Running State = 2
+)
