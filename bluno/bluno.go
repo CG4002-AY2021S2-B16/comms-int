@@ -33,14 +33,10 @@ type Bluno struct {
 // - Remember to check disconnected before interacting with channel
 // - To be run inside a goroutine
 func (b *Bluno) Connect(pCtx context.Context) bool {
-	// Create a context that times out after 1 second
-	ctx, cancel := context.WithTimeout(
-		pCtx,
-		commsintconfig.ConnectionEstablishTimeout,
-	)
-	defer cancel()
+	time.Sleep(2 * time.Second)
 
-	client, err := ble.Dial(ctx, ble.NewAddr(b.Address))
+	// Dial to Bluno
+	client, err := ble.Dial(pCtx, ble.NewAddr(b.Address))
 	if err != nil {
 		if commsintconfig.DebugMode {
 			log.Printf("client_connection_fail|addr=%s|err=%s", b.Address, err)
@@ -50,7 +46,6 @@ func (b *Bluno) Connect(pCtx context.Context) bool {
 	if commsintconfig.DebugMode {
 		log.Printf("client_connection_succeeded|addr=%s", b.Address)
 	}
-
 	b.SetClient(&client)
 	return true
 }
@@ -60,8 +55,10 @@ func (b *Bluno) Connect(pCtx context.Context) bool {
 func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup) bool {
 	defer b.Client.CancelConnection()
 
+	// Perform targeted find of characteristic
 	svcUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoServiceReducedUUID), ble.MustParse(commsintconfig.BlunoServiceUUID)}
 	charUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoCharacteristicReducedUUID), ble.MustParse(commsintconfig.BlunoCharacteristicUUID)}
+	//commandUUID := []ble.UUID{ble.UUID16(commsintconfig.CommandCharacteristicReducedUUID), ble.MustParse(commsintconfig.CommandCharacteristicUUID)}
 
 	// Isolate the service
 	s, err := b.Client.DiscoverServices(svcUUID)
@@ -81,110 +78,167 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup) bool {
 		return false
 	}
 
-	// Add 2902, because its missing from Bluno: https://www.dfrobot.com/forum/viewtopic.php?t=2035
+	// Add 2902 descriptor, because its missing from Bluno: https://www.dfrobot.com/forum/viewtopic.php?t=2035
+	// Go requires BLE spec conformity for maintaining connections, otherwise errors
 	characteristic := c[0]
 	customDescriptor := ble.NewDescriptor(ble.UUID16(commsintconfig.ClientCharacteristicConfig))
 	customDescriptor.Handle = commsintconfig.ClientCharacteristicConfigHandle
 	characteristic.CCCD = customDescriptor
 
-	err = b.Client.Subscribe(characteristic, false, b.parseResponse)
+	hsFail := make(chan bool, 1)
+
+	// Subscribe to notifications
+	err = b.Client.Subscribe(characteristic, false, b.parseResponse(hsFail))
 	if err != nil {
 		if commsintconfig.DebugMode {
 			log.Printf("client_subscription_err|addr=%s|err=%s", b.Address, err)
 		}
 		return false
 	}
-	defer b.Client.ClearSubscriptions()
 
+	time.Sleep(1500 * time.Millisecond)
 	// Handshake
-	log.Printf("Handshake initiated with %s (%s)", b.Name, b.Address)
-	b.Client.WriteCharacteristic(characteristic, []byte{commsintconfig.InitHandshakeSymbol}, true)
+	log.Printf("Handshake initiated with %s (%s) service=%s char=%s", b.Name, b.Address, s[0].UUID.String(), characteristic.UUID.String())
+	toSend := []byte{commsintconfig.InitHandshakeSymbol, byte('\r'), '\n'}
+	err = b.Client.WriteCharacteristic(characteristic, toSend, false)
+	if err != nil {
+		log.Printf("write_handshake|err=%s", err)
+	}
+	log.Printf("Handshake sent to %s (%s)|[ %X ]", b.Name, b.Address, toSend)
 
-	// Start ticker
+	// Start tickers
 	tickChan := time.NewTicker(commsintconfig.ConnectionLivenessCheckInterval)
+	establishTickChan := time.NewTicker(commsintconfig.ConnectionEstablishTimeout)
 
 	// Read
 	for {
 		select {
 		case <-b.Client.Disconnected():
-			log.Println("client_connection_disconnected")
-			b.PrintStats()
+			log.Printf("client_connection_disconnected|addr=%s", b.Address)
+			//b.PrintStats()
+			err := b.Client.CancelConnection()
+			if err != nil {
+				log.Printf("client_connection_terminated|client_dc_3|err=%s", err)
+			}
 			return false
+		case <-hsFail:
+			log.Printf("client_handshake_fail|addr=%s", b.Address)
+			b.Client.Unsubscribe(characteristic, false)
+			return false
+
 		case t := <-tickChan.C:
 			diff := t.Sub(b.LastPacketReceivedAt)
 			if b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionLivenessTimeout {
-				b.PrintStats()
+				//b.PrintStats()
 				log.Printf(
-					"client_connection_terminated|ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
-					b.PacketsReceived,
-					b.LastPacketReceivedAt,
-					t,
-				)
-				return false
-			} else if !b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionEstablishTimeout {
-				log.Printf(
-					"client_connection_terminated|ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
+					"client_connection_terminated|liveness_ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
 					b.PacketsReceived,
 					b.LastPacketReceivedAt,
 					t,
 				)
 				return false
 			}
+		case et := <-establishTickChan.C:
+			log.Printf("time_check|et=%s", et.String())
+			diff := et.Sub(b.LastPacketReceivedAt)
+			if !b.HandshakeAcknowledged && diff >= 5*commsintconfig.ConnectionEstablishTimeout {
+				log.Printf(
+					"client_connection_terminated|establish_ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
+					b.PacketsReceived,
+					b.LastPacketReceivedAt,
+					et,
+				)
+				return false
+			}
+			// } else if !b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionEstablishTimeout {
+			// 	// We attempt a reset of built in BLE chip
+			// 	log.Printf("Attempting reset...")
+
+			// 	// Isolate the characteristic
+			// 	cc, err := b.Client.DiscoverCharacteristics(commandUUID, s[0])
+			// 	if err != nil || len(cc) != 2 { // two because we already discovered dfb1 earlier
+			// 		if commsintconfig.DebugMode {
+			// 			log.Printf("command_char_discovery_err|addr=%s|err=%s|num_characteristics=%d", b.Address, err, len(cc))
+			// 		}
+			// 		return false
+			// 	}
+
+			// 	// Add 2902
+			// 	commandCharacteristic := cc[1]
+			// 	commandCustomDescriptor := ble.NewDescriptor(ble.UUID16(commsintconfig.ClientCharacteristicConfig))
+			// 	commandCustomDescriptor.Handle = commsintconfig.ClientCharacteristicConfigHandle
+			// 	commandCharacteristic.CCCD = customDescriptor
+
+			// 	// Subscribe
+			// 	err = b.Client.Subscribe(commandCharacteristic, false, b.parseResponse)
+			// 	if err != nil {
+			// 		if commsintconfig.DebugMode {
+			// 			log.Printf("command_subscription_err|addr=%s|err=%s", b.Address, err)
+			// 		}
+			// 		return false
+			// 	}
+			// 	defer b.Client.Unsubscribe(commandCharacteristic, false)
+
+			// 	// Write reset BLE AT-Command
+			// 	byteReset := []byte(commsintconfig.BLEResetString)
+			// 	b.Client.WriteCharacteristic(commandCharacteristic, byteReset, false)
+			// 	log.Printf("command_reset_sent|[ % X ]", byteReset)
+			// }
 		case <-pCtx.Done():
 			log.Printf("client_connection_terminated|force=true|packets received=%d", b.PacketsReceived)
-			b.PrintStats()
+			//b.PrintStats()
+			b.Client.ClearSubscriptions()
 			wg.Done()
 			return true
 		}
 	}
 }
 
-func (b *Bluno) parseResponse(resp []byte) {
-	b.LastPacketReceivedAt = time.Now()
-	b.PacketsReceived++
-	if commsintconfig.DebugMode {
-		log.Printf("Received packet from bluno: [ % X ]\n", resp)
-	}
-
-	var p commsintconfig.Packet = commsintconfig.Packet{Type: commsintconfig.Invalid}
-
-	if len(resp) != commsintconfig.ExpectedPacketSize {
-		b.PacketsIncorrectLength++
+func (b *Bluno) parseResponse(hsFail chan bool) func([]byte) {
+	return func(resp []byte) {
+		b.LastPacketReceivedAt = time.Now()
+		b.PacketsReceived++
 		if commsintconfig.DebugMode {
-			log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(resp), resp)
+			log.Printf("Received packet from bluno: [ % X ]\n", resp)
 		}
-		// return // discard
 
-		var reconciled bool
-		p, reconciled = b.ReconcilePacket(resp)
-		if !reconciled {
-			return
-		}
-		b.PacketsReconciled++
-	} else {
-		p = constructPacket(resp)
-	}
+		var p commsintconfig.Packet = commsintconfig.Packet{Type: commsintconfig.Invalid}
 
-	if commsintconfig.DebugMode {
-		log.Printf("Response parsed|%+v\n", p)
-	}
+		if len(resp) != commsintconfig.ExpectedPacketSize {
+			b.PacketsIncorrectLength++
+			if commsintconfig.DebugMode {
+				log.Printf("Received packet from bluno of incorrect size = %d: [ % X ]\n", len(resp), resp)
+			}
 
-	switch p.Type {
-	case commsintconfig.Ack:
-		log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
-		b.HandshakeAcknowledged = true
-	case commsintconfig.Invalid:
-		b.PacketsInvalidType++
-	default:
-		if b.HandshakeAcknowledged == false {
-			b.PacketsInvalidType++
+			var reconciled bool
+			p, reconciled = b.ReconcilePacket(resp)
+			if !reconciled {
+				return
+			}
+			b.PacketsReconciled++
 		} else {
-			b.PacketsImmSuccess++
-			// Send to output buffer
+			p = constructPacket(resp)
 		}
 
-	}
+		if commsintconfig.DebugMode {
+			log.Printf("Response parsed|%+v\n", p)
+		}
 
+		switch p.Type {
+		case commsintconfig.Ack:
+			log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
+			b.HandshakeAcknowledged = true
+		case commsintconfig.Invalid:
+			b.PacketsInvalidType++
+		default:
+			if b.HandshakeAcknowledged == false {
+				hsFail <- true
+			} else {
+				b.PacketsImmSuccess++
+				// Send to output buffer
+			}
+		}
+	}
 }
 
 // determinePacketType returns the packet's type based on the first byte

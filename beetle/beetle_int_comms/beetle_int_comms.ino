@@ -75,7 +75,9 @@ void handshakeResponse() {
   fillChecksum();
   
   // Send response out
-  Serial.write(sendBuffer, PACKET_SIZE);
+  Serial.print(sendBuffer);
+  //Serial.write(sendBuffer, PACKET_SIZE);
+
 }
 
 
@@ -94,7 +96,8 @@ void dataResponse() {
   fillChecksum();
 
   // Send response out
-   Serial.write(sendBuffer, PACKET_SIZE);
+  Serial.print(sendBuffer);
+  //Serial.write(sendBuffer, PACKET_SIZE);
 }
 
 

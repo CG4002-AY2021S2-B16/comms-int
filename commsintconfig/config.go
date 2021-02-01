@@ -17,14 +17,23 @@ var BlunoCharacteristicUUID string = "0000dfb1-0000-1000-8000-00805f9b34fb"
 // BlunoCharacteristicReducedUUID is the same as the above, except it is trimmed down to 2 bytes for library compatibility
 var BlunoCharacteristicReducedUUID uint16 = 0xdfb1
 
+// ClientCharacteristicConfigHandle - https://www.dfrobot.com/forum/viewtopic.php?t=148
+var ClientCharacteristicConfigHandle uint16 = 0x0025
+
+// CommandCharacteristicUUID is the single (predecided) Characteristic used for AT Commands
+var CommandCharacteristicUUID string = "0000dfb2-0000-1000-8000-00805f9b34fb"
+
+// CommandCharacteristicReducedUUID is the same as the above, except it is trimmed down to 2 bytes for library compatibility
+var CommandCharacteristicReducedUUID uint16 = 0xdfb2
+
+// CommandCharacteristicConfigHandle is used for reset of BLE chip - https://www.dfrobot.com/forum/viewtopic.php?t=26173
+var CommandCharacteristicConfigHandle uint16 = 0x0028
+
 // ClientCharacteristicConfig is the descriptor required for subscription
 // References (some good stuff right here):
 // https://github.com/pauldemarco/flutter_blue/issues/185
 // https://www.dfrobot.com/forum/viewtopic.php?t=2035
 var ClientCharacteristicConfig uint16 = 0x2902
-
-// ClientCharacteristicConfigHandle - https://www.dfrobot.com/forum/viewtopic.php?t=148
-var ClientCharacteristicConfigHandle uint16 = 0x0025
 
 // InitHandshakeSymbol is the symbol used for handshake initialization
 var InitHandshakeSymbol byte = 'A'
@@ -64,13 +73,13 @@ type Packet struct {
 // Connection timeout parameters
 
 // ConnectionEstablishTimeout is the timeout for establishing connection, and then another 1 sec for handshake
-var ConnectionEstablishTimeout time.Duration = 1 * time.Second
+var ConnectionEstablishTimeout time.Duration = 5 * time.Second
 
 // ConnectionLivenessCheckInterval is the intervals in which it is checked whether a reconnection should be triggered
 var ConnectionLivenessCheckInterval time.Duration = 40 * time.Millisecond
 
 // ConnectionLivenessTimeout is the max leeway, after which reconnection is attempted
-var ConnectionLivenessTimeout time.Duration = 200 * time.Millisecond
+var ConnectionLivenessTimeout time.Duration = 2000 * time.Millisecond
 
 // State indicates current program status
 type State int
@@ -81,3 +90,6 @@ const (
 	// Running refers to a running application that is interacting with blunos and writing to output
 	Running State = 2
 )
+
+// BLEResetString refer to the string version of "AT+RESTART<CR+LF>"
+var BLEResetString string = "AT+VERSION=?\r\n" //"AT+RESTART\r\n"
