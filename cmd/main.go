@@ -18,13 +18,15 @@ func main() {
 	if commsintconfig.DebugMode {
 		log.SetFlags(log.Ldate | log.Lmicroseconds)
 	}
-
 	d, err := linux.NewDevice()
 	if err != nil {
 		log.Fatal("Can't create new device ", err)
 	}
 	ble.SetDefaultDevice(d)
 	defer d.Stop()
+
+	// Lock is used to create clients one at a time
+	var clientCreation sync.Mutex
 
 	// Setup application state and upstream connection
 	ctx, cancel := context.WithCancel(context.Background())
@@ -51,7 +53,7 @@ func main() {
 		case msg := <-us.ReadChan:
 			if as.GetState() == commsintconfig.Waiting && msg == constants.UpstreamResumeMsg {
 				as.SetState(commsintconfig.Running)
-				go startApp(as.MasterCtx, outBuf.EnqueueBuffer)
+				go startApp(as.MasterCtx, outBuf.EnqueueBuffer, &clientCreation)
 			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamPauseMsg {
 				as.MasterCtxCancel()
 				as = appstate.CreateAppState(ctx)
@@ -61,7 +63,7 @@ func main() {
 	}
 }
 
-func startApp(ctx context.Context, wr func(commsintconfig.Packet)) {
+func startApp(ctx context.Context, wr func(commsintconfig.Packet), m *sync.Mutex) {
 	wg := sync.WaitGroup{}
 
 	for _, b := range constants.RetrieveValidBlunos() {
@@ -69,16 +71,17 @@ func startApp(ctx context.Context, wr func(commsintconfig.Packet)) {
 		// Asynchronously establish connection to Bluno and listen to incoming messages from peripheral
 		wg.Add(1)
 
-		go func(blno *bluno.Bluno) {
+		go func(blno bluno.Bluno) {
+			log.Printf("Master goroutine started for %s, addr=%s", blno.Name, blno.Address)
 			for {
-				success := blno.Connect(ctx)
+				success := blno.Connect(ctx, m)
 				if success {
 					if listenCancel := blno.Listen(ctx, &wg, wr); listenCancel {
 						return
 					}
 				}
 			}
-		}(&b)
+		}(b)
 	}
 
 	log.Println("Waiting on goroutines...")

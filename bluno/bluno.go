@@ -33,15 +33,19 @@ type Bluno struct {
 // - Remember to close client when done
 // - Remember to check disconnected before interacting with channel
 // - To be run inside a goroutine
-func (b *Bluno) Connect(pCtx context.Context) bool {
-	time.Sleep(2 * time.Second)
+func (b *Bluno) Connect(pCtx context.Context, m *sync.Mutex) bool {
+	timedCtx, cancel := context.WithTimeout(pCtx, commsintconfig.ConnectionEstablishTimeout)
+	defer cancel()
 
 	// Dial to Bluno
-	client, err := ble.Dial(pCtx, ble.NewAddr(b.Address))
+	m.Lock()
+	client, err := ble.Dial(timedCtx, ble.NewAddr(b.Address))
+	m.Unlock()
 	if err != nil {
 		if commsintconfig.DebugMode {
 			log.Printf("client_connection_fail|addr=%s|err=%s", b.Address, err)
 		}
+		time.Sleep(2 * time.Second)
 		return false
 	}
 	if commsintconfig.DebugMode {
