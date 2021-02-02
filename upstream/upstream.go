@@ -15,11 +15,10 @@ import (
 // IOHandler is a wrapper for a IO
 type IOHandler struct {
 	sync.Mutex
-
-	ReadChan  chan string
-	WriteChan chan commsintconfig.Packet
-	sent      int
-	received  int
+	ReadChan     chan string
+	WriteRoutine func(p *[]commsintconfig.Packet)
+	sent         int
+	received     int
 }
 
 // Instruction is an incoming message from upstream
@@ -28,76 +27,64 @@ type Instruction struct {
 }
 
 // NewUpstreamConnection creates and returns a new wrapper for input and output sockets
-func NewUpstreamConnection() *IOHandler {
+func NewUpstreamConnection() (*IOHandler, error) {
 	os.Remove(constants.OutgoingDataSock)
 	os.Remove(constants.IncomingNotifSock)
 
-	out := make(chan commsintconfig.Packet)
 	inc := make(chan string)
 
 	ioh := &IOHandler{
-		ReadChan:  inc,
-		WriteChan: out,
-		sent:      0,
-		received:  0,
+		ReadChan: inc,
+		sent:     0,
+		received: 0,
 	}
 
 	outgoingListener, err := net.Listen("unix", constants.OutgoingDataSock)
 	if err != nil {
 		log.Fatalf("upstream|establishing_data_sock|err=%s", err)
+		return &IOHandler{}, err
 	}
 
 	incomingListener, err := net.Listen("unix", constants.IncomingNotifSock)
 	if err != nil {
 		log.Fatalf("upstream|establishing_notif_sock|err=%s", err)
+		return &IOHandler{}, err
 	}
 
-	go func() {
-		defer outgoingListener.Close()
-		for {
-			outgoing, err := outgoingListener.Accept()
-			log.Printf("upstream|outgoing_listener_accept")
-			if err != nil {
-				log.Printf("upstream|outgoing_listener_accept|err=%s", err)
-				return
-			}
-			go writeRoutine(outgoing, out)
-		}
-	}()
+	outgoing, err := outgoingListener.Accept()
+	log.Printf("upstream|outgoing_listener_accept")
+	if err != nil {
+		log.Fatalf("upstream|outgoing_listener_accept|err=%s", err)
+		return &IOHandler{}, err
+	}
+	ioh.WriteRoutine = writeRoutine(outgoing)
 
-	go func() {
-		defer incomingListener.Close()
+	incoming, err := incomingListener.Accept()
+	log.Printf("upstream|incoming_listener_accept")
+	if err != nil {
+		log.Printf("upstream|incoming_listener_accept|err=%s", err)
+		return &IOHandler{}, err
+	}
 
-		for {
-			incoming, err := incomingListener.Accept()
-			log.Printf("upstream|incoming_listener_accept")
-			if err != nil {
-				log.Printf("upstream|incoming_listener_accept|err=%s", err)
-				return
-			}
-			go readRoutine(incoming, inc)
-		}
-	}()
+	// Start up a read goroutine
+	go readRoutine(incoming, inc)
 
-	return ioh
+	return ioh, nil
 }
 
 // writeRoutine listens for incoming write requests from the application
 // and writes them out to the unix socket
-func writeRoutine(oConn net.Conn, comm chan commsintconfig.Packet) {
+func writeRoutine(oConn net.Conn) func(p *[]commsintconfig.Packet) {
 	oConn.SetWriteDeadline(time.Time{}) // Set to zero (no timeout)
-	for {
-		select {
-		case p := <-comm:
-			msg, err := json.Marshal(p)
+	return func(p *[]commsintconfig.Packet) {
+		msg, err := json.Marshal(p)
+		if err != nil {
+			log.Printf("upstream|write_routine_marshal|err=%s", err)
+		} else {
+			_, err := oConn.Write(msg)
 			if err != nil {
-				log.Printf("upstream|write_routine_marshal|err=%s", err)
-			} else {
-				_, err := oConn.Write(msg)
-				if err != nil {
-					log.Printf("upstream|write_routine|err=%s", err)
-					return
-				}
+				log.Printf("upstream|write_routine|err=%s", err)
+				return
 			}
 		}
 	}

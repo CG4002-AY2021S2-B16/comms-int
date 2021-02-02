@@ -31,16 +31,27 @@ func main() {
 	defer cancel()
 
 	var as *appstate.AppState = appstate.CreateAppState(ctx)
-	var us *upstream.IOHandler = upstream.NewUpstreamConnection()
+	var us *upstream.IOHandler
 
-	log.Println("Setup successful, waiting for incoming socket communication...")
+	log.Println("waiting for incoming socket communication...")
+	us, err = upstream.NewUpstreamConnection()
+	if err != nil {
+		log.Fatalf("Error occurred during socket setup| err=%s", err)
+	}
+	outBuf := upstream.CreateOutputBuffer()
+
+	// Start up goroutines
+	go outBuf.EnqueueChannelProcessor()
+	go outBuf.DequeueProcessor(us)
+	log.Println("Setup successful, sockets successfully connected.")
+
 	// Upon receiving new message, check if app should be running or stopped
 	for {
 		select {
 		case msg := <-us.ReadChan:
 			if as.GetState() == commsintconfig.Waiting && msg == constants.UpstreamResumeMsg {
 				as.SetState(commsintconfig.Running)
-				go startApp(as.MasterCtx, us.WriteChan)
+				go startApp(as.MasterCtx, outBuf.EnqueueBuffer)
 			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamPauseMsg {
 				as.MasterCtxCancel()
 				as = appstate.CreateAppState(ctx)
@@ -50,7 +61,7 @@ func main() {
 	}
 }
 
-func startApp(ctx context.Context, wc chan commsintconfig.Packet) {
+func startApp(ctx context.Context, wr func(commsintconfig.Packet)) {
 	wg := sync.WaitGroup{}
 
 	for _, b := range constants.RetrieveValidBlunos() {
@@ -62,7 +73,7 @@ func startApp(ctx context.Context, wc chan commsintconfig.Packet) {
 			for {
 				success := blno.Connect(ctx)
 				if success {
-					if listenCancel := blno.Listen(ctx, &wg, wc); listenCancel {
+					if listenCancel := blno.Listen(ctx, &wg, wr); listenCancel {
 						return
 					}
 				}

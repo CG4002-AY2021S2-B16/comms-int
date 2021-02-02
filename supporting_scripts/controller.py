@@ -30,8 +30,6 @@ def control_ble():
         
         print("Data = ", data)
         client.send(data.encode('utf-8'))
-        time.sleep(1)
-    
     client.close()
 
 
@@ -46,8 +44,8 @@ def read_ble_data():
 
     while True:
         # the logic needs to be much more complex here
-        print(client.recv(100))
-        time.sleep(1)
+        print("Waiting...")
+        print(client.recv(4096))
 
     client.close()
 
