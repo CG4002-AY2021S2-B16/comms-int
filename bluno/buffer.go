@@ -17,7 +17,7 @@ func (b *Bluno) ReconcilePacket(curr []byte) (commsintconfig.Packet, bool) {
 			if commsintconfig.DebugMode {
 				log.Printf("reconcile_packet|success|% x", append(prev, curr...))
 			}
-			return constructPacket(append(prev, curr...)), true
+			return constructPacket(append(prev, curr...), b.Num), true
 		}
 		b.Buffer.PushBack(prev)
 	}

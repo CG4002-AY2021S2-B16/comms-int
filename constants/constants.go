@@ -30,9 +30,11 @@ var UpstreamNotifBufferSize int = 1000
 var blunoOne bluno.Bluno = bluno.Bluno{
 	Address: "80:30:DC:E9:1C:34",
 	Name:    "BlunoOne",
+	Num:     1,
 }
 
 var blunoTwo bluno.Bluno = bluno.Bluno{
 	Address: "80:30:DC:D9:0C:B2",
 	Name:    "BlunoTwo",
+	Num:     2,
 }

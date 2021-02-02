@@ -16,6 +16,7 @@ import (
 type Bluno struct {
 	Address                string     `json:"address"`
 	Name                   string     `json:"name"`
+	Num                    uint8      `json:"num"`
 	Client                 ble.Client `json:"client"`
 	PacketsReceived        uint32     `json:"packets_received"`
 	HandshakeAcknowledged  bool       `json:"handshake_acknowledged"`
@@ -217,7 +218,7 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 			}
 			b.PacketsReconciled++
 		} else {
-			p = constructPacket(resp)
+			p = constructPacket(resp, b.Num)
 		}
 
 		switch p.Type {
@@ -253,15 +254,16 @@ func twoByteToNum(d []byte, start uint8) uint16 {
 	return binary.BigEndian.Uint16(d[start : start+2])
 }
 
-func constructPacket(resp []byte) commsintconfig.Packet {
+func constructPacket(resp []byte, blunoNum uint8) commsintconfig.Packet {
 	return commsintconfig.Packet{
-		Type:  determinePacketType(resp),
-		X:     twoByteToNum(resp, 1),
-		Y:     twoByteToNum(resp, 3),
-		Z:     twoByteToNum(resp, 5),
-		Yaw:   twoByteToNum(resp, 7),
-		Pitch: twoByteToNum(resp, 9),
-		Roll:  twoByteToNum(resp, 11),
+		Type:        determinePacketType(resp),
+		X:           twoByteToNum(resp, 1),
+		Y:           twoByteToNum(resp, 3),
+		Z:           twoByteToNum(resp, 5),
+		Yaw:         twoByteToNum(resp, 7),
+		Pitch:       twoByteToNum(resp, 9),
+		Roll:        twoByteToNum(resp, 11),
+		BlunoNumber: blunoNum,
 	}
 }
 

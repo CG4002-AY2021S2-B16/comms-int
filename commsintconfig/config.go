@@ -61,13 +61,14 @@ const (
 
 // Packet is constructed from a complete bluetooth response
 type Packet struct {
-	Type  PacketType
-	X     uint16 `json:"x"`
-	Y     uint16 `json:"y"`
-	Z     uint16 `json:"z"`
-	Yaw   uint16 `json:"yaw"`
-	Pitch uint16 `json:"pitch"`
-	Roll  uint16 `json:"roll"`
+	Type        PacketType
+	X           uint16 `json:"x"`
+	Y           uint16 `json:"y"`
+	Z           uint16 `json:"z"`
+	Yaw         uint16 `json:"yaw"`
+	Pitch       uint16 `json:"pitch"`
+	Roll        uint16 `json:"roll"`
+	BlunoNumber uint8  `json:"bluno"`
 }
 
 // Connection timeout parameters
