@@ -52,7 +52,7 @@ func (b *Bluno) Connect(pCtx context.Context) bool {
 
 // Listen receives incoming connections from bluno
 // - to be called inside a goroutine
-func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup) bool {
+func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wc chan commsintconfig.Packet) bool {
 	defer b.Client.CancelConnection()
 
 	// Perform targeted find of characteristic
@@ -88,7 +88,7 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup) bool {
 	hsFail := make(chan bool, 1)
 
 	// Subscribe to notifications
-	err = b.Client.Subscribe(characteristic, false, b.parseResponse(hsFail))
+	err = b.Client.Subscribe(characteristic, false, b.parseResponse(hsFail, wc))
 	if err != nil {
 		if commsintconfig.DebugMode {
 			log.Printf("client_subscription_err|addr=%s|err=%s", b.Address, err)
@@ -194,7 +194,7 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup) bool {
 	}
 }
 
-func (b *Bluno) parseResponse(hsFail chan bool) func([]byte) {
+func (b *Bluno) parseResponse(hsFail chan bool, wc chan commsintconfig.Packet) func([]byte) {
 	return func(resp []byte) {
 		b.LastPacketReceivedAt = time.Now()
 		b.PacketsReceived++
@@ -235,7 +235,7 @@ func (b *Bluno) parseResponse(hsFail chan bool) func([]byte) {
 				hsFail <- true
 			} else {
 				b.PacketsImmSuccess++
-				// Send to output buffer
+				wc <- p // Send to output buffer
 			}
 		}
 	}

@@ -40,7 +40,7 @@ func main() {
 		case msg := <-us.ReadChan:
 			if as.GetState() == commsintconfig.Waiting && msg == constants.UpstreamResumeMsg {
 				as.SetState(commsintconfig.Running)
-				go startApp(as.MasterCtx)
+				go startApp(as.MasterCtx, us.WriteChan)
 			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamPauseMsg {
 				as.MasterCtxCancel()
 				as = appstate.CreateAppState(ctx)
@@ -50,7 +50,7 @@ func main() {
 	}
 }
 
-func startApp(ctx context.Context) {
+func startApp(ctx context.Context, wc chan commsintconfig.Packet) {
 	wg := sync.WaitGroup{}
 
 	for _, b := range constants.RetrieveValidBlunos() {
@@ -62,7 +62,7 @@ func startApp(ctx context.Context) {
 			for {
 				success := blno.Connect(ctx)
 				if success {
-					if listenCancel := blno.Listen(ctx, &wg); listenCancel {
+					if listenCancel := blno.Listen(ctx, &wg, wc); listenCancel {
 						return
 					}
 				}
