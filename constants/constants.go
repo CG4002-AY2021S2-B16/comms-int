@@ -38,3 +38,9 @@ var blunoTwo bluno.Bluno = bluno.Bluno{
 	Name:    "BlunoTwo",
 	Num:     2,
 }
+
+var blunoThree bluno.Bluno = bluno.Bluno{
+	Address: "80:30:DC:D9:1F:F0",
+	Name:    "BlunoThree",
+	Num:     3,
+}
