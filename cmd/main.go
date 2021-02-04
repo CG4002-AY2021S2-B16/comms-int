@@ -25,8 +25,9 @@ func main() {
 	ble.SetDefaultDevice(d)
 	defer d.Stop()
 
-	// Lock is used to create clients one at a time
-	var clientCreation sync.Mutex
+	// Only one BT Client connection can be performed at a time safely via a single device
+	// Use a FIFO Semaphore (channel of size 1 in golang to ensure non-starvation in reconnection queue)
+	clientCreation := make(chan bool, 1)
 
 	// Setup application state and upstream connection
 	ctx, cancel := context.WithCancel(context.Background())
@@ -66,7 +67,7 @@ func main() {
 				go outBuf.DequeueProcessor(as.MasterCtx, us)
 
 				// Start application
-				go startApp(as, outBuf.EnqueueBuffer, &clientCreation)
+				go startApp(as, outBuf.EnqueueBuffer, clientCreation)
 
 			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamPauseMsg {
 				as.MasterCtxCancel()
@@ -77,7 +78,8 @@ func main() {
 	}
 }
 
-func startApp(as *appstate.AppState, wr func(commsintconfig.Packet), m *sync.Mutex) {
+func startApp(as *appstate.AppState, wr func(commsintconfig.Packet), m chan bool) {
+	m <- true
 	wg := sync.WaitGroup{}
 
 	for _, bs := range as.BlunoStates {

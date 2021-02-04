@@ -74,7 +74,7 @@ type Packet struct {
 // Connection timeout parameters
 
 // ConnectionEstablishTimeout is the timeout for establishing connection, and then another 1 sec for handshake
-var ConnectionEstablishTimeout time.Duration = 10 * time.Second
+var ConnectionEstablishTimeout time.Duration = 1 * time.Second
 
 // ConnectionLivenessCheckInterval is the intervals in which it is checked whether a reconnection should be triggered
 var ConnectionLivenessCheckInterval time.Duration = 40 * time.Millisecond
