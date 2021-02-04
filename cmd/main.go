@@ -42,10 +42,17 @@ func main() {
 	}
 	outBuf := upstream.CreateOutputBuffer()
 
-	// Start up goroutines
-	go outBuf.EnqueueChannelProcessor()
-	go outBuf.DequeueProcessor(us)
 	log.Println("Setup successful, sockets successfully connected.")
+
+	// Append all Blunos to the monitoring goroutine
+	for _, blno := range constants.RetrieveValidBlunos() {
+		newBlnoState := appstate.CreateBlunoState(blno.Name, blno.Address)
+		as.BlunoStates = append(as.BlunoStates, newBlnoState)
+		blno.StateUpdateChan = newBlnoState.UpdateChan
+	}
+
+	// Start monitoring goroutine
+	go as.MonitorBlunos()
 
 	// Upon receiving new message, check if app should be running or stopped
 	for {
@@ -53,7 +60,14 @@ func main() {
 		case msg := <-us.ReadChan:
 			if as.GetState() == commsintconfig.Waiting && msg == constants.UpstreamResumeMsg {
 				as.SetState(commsintconfig.Running)
-				go startApp(as.MasterCtx, outBuf.EnqueueBuffer, &clientCreation)
+
+				// Start up goroutines
+				go outBuf.EnqueueChannelProcessor(as.MasterCtx)
+				go outBuf.DequeueProcessor(as.MasterCtx, us)
+
+				// Start application
+				go startApp(as, outBuf.EnqueueBuffer, &clientCreation)
+
 			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamPauseMsg {
 				as.MasterCtxCancel()
 				as = appstate.CreateAppState(ctx)
@@ -63,20 +77,24 @@ func main() {
 	}
 }
 
-func startApp(ctx context.Context, wr func(commsintconfig.Packet), m *sync.Mutex) {
+func startApp(as *appstate.AppState, wr func(commsintconfig.Packet), m *sync.Mutex) {
 	wg := sync.WaitGroup{}
+
+	for _, bs := range as.BlunoStates {
+		go bs.UpdateBlunoStatus(as.MasterCtx)
+	}
 
 	for _, b := range constants.RetrieveValidBlunos() {
 		// 1 master goroutine per bluno
 		// Asynchronously establish connection to Bluno and listen to incoming messages from peripheral
 		wg.Add(1)
 
-		go func(blno bluno.Bluno) {
-			log.Printf("Master goroutine started for %s, addr=%s", blno.Name, blno.Address)
+		go func(blno *bluno.Bluno) {
+			log.Printf("Master goroutine started for %s, addr=%s, stateUpdateChan=%v", blno.Name, blno.Address, blno.StateUpdateChan)
 			for {
-				success := blno.Connect(ctx, m)
+				success := blno.Connect(as.MasterCtx, m)
 				if success {
-					if listenCancel := blno.Listen(ctx, &wg, wr); listenCancel {
+					if listenCancel := blno.Listen(as.MasterCtx, &wg, wr); listenCancel {
 						return
 					}
 				}

@@ -11,6 +11,7 @@ services:
       - .:/var/www/comms-int
       - ./sockets:/tmp/www/comms/
     command: "go run main.go"
+    tty: true
   python_controller:
     build:
       context: ./supporting_scripts

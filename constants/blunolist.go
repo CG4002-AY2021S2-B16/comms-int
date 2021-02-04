@@ -6,10 +6,10 @@ import (
 
 // RetrieveValidBlunos retrieves the list of Blunos this central should be concerned with
 // connecting to
-func RetrieveValidBlunos() []bluno.Bluno {
-	return []bluno.Bluno{
-		blunoOne,
-		blunoTwo,
-		blunoThree,
+func RetrieveValidBlunos() []*bluno.Bluno {
+	return []*bluno.Bluno{
+		&blunoOne,
+		&blunoTwo,
+		&blunoThree,
 	}
 }

@@ -3,7 +3,7 @@ package commsintconfig
 import "time"
 
 // DebugMode enables debug log messages
-var DebugMode bool = true
+var DebugMode bool = false
 
 // BlunoServiceUUID is the single (predecided) Service used for Serial communications from the bluno beetle
 var BlunoServiceUUID string = "0000dfb0-0000-1000-8000-00805f9b34fb"
@@ -74,7 +74,7 @@ type Packet struct {
 // Connection timeout parameters
 
 // ConnectionEstablishTimeout is the timeout for establishing connection, and then another 1 sec for handshake
-var ConnectionEstablishTimeout time.Duration = 3 * time.Second
+var ConnectionEstablishTimeout time.Duration = 10 * time.Second
 
 // ConnectionLivenessCheckInterval is the intervals in which it is checked whether a reconnection should be triggered
 var ConnectionLivenessCheckInterval time.Duration = 40 * time.Millisecond
@@ -100,3 +100,17 @@ var OutputSize int = 10
 
 // OutputDequeueInterval wakes up the dequeue goroutine to send data over via ext comms interface
 var OutputDequeueInterval time.Duration = 100 * time.Millisecond
+
+// BlunoStatus indicates the current status of blunos being managed by the int comm server
+type BlunoStatus uint8
+
+const (
+	// NotConnected refers to a bluno that is not connected
+	NotConnected BlunoStatus = 0
+
+	// NotHandshaked refers to a bluno that is connected but has not had a successful handshake
+	NotHandshaked BlunoStatus = 1
+
+	// Transmitting refers to a bluno that is connected and transmitting data
+	Transmitting BlunoStatus = 2
+)

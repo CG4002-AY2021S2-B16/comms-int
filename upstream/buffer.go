@@ -2,6 +2,7 @@ package upstream
 
 import (
 	"container/list"
+	"context"
 	"sync"
 	"time"
 
@@ -30,20 +31,22 @@ func (o *OutputBuffer) EnqueueBuffer(c commsintconfig.Packet) {
 
 // EnqueueChannelProcessor listens to the enqueue channel and adds it to the buffer.
 // This should be run within a permanent goroutine
-func (o *OutputBuffer) EnqueueChannelProcessor() {
+func (o *OutputBuffer) EnqueueChannelProcessor(ctx context.Context) {
 	for {
 		select {
 		case p := <-o.enqueueChan:
 			o.Lock()
 			o.L.PushBack(p)
 			o.Unlock()
+		case <-ctx.Done():
+			return
 		}
 	}
 }
 
 // DequeueProcessor periodically wakes up to create output and send it over to the ext comms interface
 // This should be run within a permanent goroutine
-func (o *OutputBuffer) DequeueProcessor(us *IOHandler) {
+func (o *OutputBuffer) DequeueProcessor(ctx context.Context, us *IOHandler) {
 	t := time.NewTicker(commsintconfig.OutputDequeueInterval)
 
 	for {
@@ -59,6 +62,8 @@ func (o *OutputBuffer) DequeueProcessor(us *IOHandler) {
 				go us.WriteRoutine(&arr)
 			}
 			o.Unlock()
+		case <-ctx.Done():
+			return
 		}
 	}
 }

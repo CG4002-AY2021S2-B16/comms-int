@@ -27,6 +27,7 @@ type Bluno struct {
 	PacketsReconciled      uint32     `json:"packets_reconciled"`
 	StartTime              time.Time  `json:"start_time"`
 	Buffer                 *list.List `json:"response_buffer"`
+	StateUpdateChan        chan commsintconfig.BlunoStatus
 }
 
 // Connect establishes a connection with the physical bluno
@@ -34,11 +35,11 @@ type Bluno struct {
 // - Remember to check disconnected before interacting with channel
 // - To be run inside a goroutine
 func (b *Bluno) Connect(pCtx context.Context, m *sync.Mutex) bool {
+	// Dial to Bluno
+	m.Lock()
 	timedCtx, cancel := context.WithTimeout(pCtx, commsintconfig.ConnectionEstablishTimeout)
 	defer cancel()
 
-	// Dial to Bluno
-	m.Lock()
 	client, err := ble.Dial(timedCtx, ble.NewAddr(b.Address))
 	m.Unlock()
 	if err != nil {
@@ -48,10 +49,11 @@ func (b *Bluno) Connect(pCtx context.Context, m *sync.Mutex) bool {
 		time.Sleep(2 * time.Second)
 		return false
 	}
+	b.SetClient(&client)
+	b.StateUpdateChan <- commsintconfig.NotHandshaked
 	if commsintconfig.DebugMode {
 		log.Printf("client_connection_succeeded|addr=%s", b.Address)
 	}
-	b.SetClient(&client)
 	return true
 }
 
@@ -119,12 +121,9 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 	for {
 		select {
 		case <-b.Client.Disconnected():
+			b.StateUpdateChan <- commsintconfig.NotConnected
 			log.Printf("client_connection_disconnected|addr=%s", b.Address)
 			//b.PrintStats()
-			err := b.Client.CancelConnection()
-			if err != nil {
-				log.Printf("client_connection_terminated|client_dc_3|err=%s", err)
-			}
 			return false
 		case <-hsFail:
 			log.Printf("client_handshake_fail|addr=%s", b.Address)
@@ -141,6 +140,7 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 					b.LastPacketReceivedAt,
 					t,
 				)
+				b.StateUpdateChan <- commsintconfig.NotConnected
 				return false
 			}
 		case et := <-establishTickChan.C:
@@ -153,6 +153,7 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 					b.LastPacketReceivedAt,
 					et,
 				)
+				b.StateUpdateChan <- commsintconfig.NotConnected
 				return false
 			}
 			// } else if !b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionEstablishTimeout {
@@ -192,6 +193,7 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 		case <-pCtx.Done():
 			log.Printf("client_connection_terminated|force=true|packets received=%d", b.PacketsReceived)
 			//b.PrintStats()
+			b.StateUpdateChan <- commsintconfig.NotConnected
 			b.Client.ClearSubscriptions()
 			wg.Done()
 			return true
@@ -228,6 +230,7 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 		switch p.Type {
 		case commsintconfig.Ack:
 			log.Printf("Handshake successful with %s (%s)", b.Name, b.Address)
+			b.StateUpdateChan <- commsintconfig.Transmitting
 			b.HandshakeAcknowledged = true
 		case commsintconfig.Invalid:
 			b.PacketsInvalidType++
