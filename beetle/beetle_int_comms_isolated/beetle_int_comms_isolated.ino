@@ -87,13 +87,13 @@ uint8_t* addLongToBuffer(uint8_t* start, uint32_t x) {
 
 
 // Adds 16-bit IMU data to the buffer 
-uint8_t* addIMUDataToBuffer(uint8_t* next, uint16_t x, uint16_t y, uint16_t z, uint16_t yaw, uint16_t pitch, uint16_t roll) {
+uint8_t* addIMUDataToBuffer(uint8_t* next, uint16_t x, uint16_t y, uint16_t z, uint16_t pitch, uint16_t roll, uint16_t yaw) {
   next = addIntToBuffer(next, x);
   next = addIntToBuffer(next, y);
   next = addIntToBuffer(next, z);
-  next = addIntToBuffer(next, yaw);
   next = addIntToBuffer(next, pitch);
   next = addIntToBuffer(next, roll);
+  next = addIntToBuffer(next, yaw);
   return next;
 }
 
@@ -139,7 +139,7 @@ void handshakeResponse() {
   buf = addLongToBuffer(buf, calculateTimestamp());
   buf = addIMUDataToBuffer(buf, val, val-1, val-2, val-3, val-4, val-5);
 
-  uint8_t* partial = (muscle_sensor_active)? addMuscleSensorDataToBuffer(buf, 512) : addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
+  uint8_t* partial = addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
   buf = setAckPacketTypeToBuffer(partial);
 
   // Calculate and fill in checksum
@@ -151,7 +151,10 @@ void handshakeResponse() {
 
 
 // dataResponse prepares the data to be sent out
-void dataResponse() {
+// Rotation about X axis = pitch
+// Rotation about Y axis = roll
+// Rotation about Z axis = yaw
+void dataResponse(int16_t X, int16_t Y, int16_t Z, int16_t pitch, int16_t roll, int16_t yaw) {
   // Pre-process
   val -= 1;
   clearSendBuffer();
@@ -159,9 +162,9 @@ void dataResponse() {
   
   // Fill different sections of the buffer
   buf = addLongToBuffer(buf, calculateTimestamp());
-  buf = addIMUDataToBuffer(buf, val, val-1, val-2, val-3, val-4, val-5);
+  buf = addIMUDataToBuffer(buf, X, Y, Z, pitch, roll, yaw);
 
-  uint8_t* partial = (muscle_sensor_active)? addMuscleSensorDataToBuffer(buf, 512) : addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
+  uint8_t* partial = (muscle_sensor_active)? addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL - 1) : addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
   buf = setDataPacketTypeToBuffer(partial);
 
   // Calculate and fill in checksum

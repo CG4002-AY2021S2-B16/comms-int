@@ -3,7 +3,7 @@ package commsintconfig
 import "time"
 
 // DebugMode enables debug log messages
-var DebugMode bool = false
+var DebugMode bool = true
 
 // BlunoServiceUUID is the single (predecided) Service used for Serial communications from the bluno beetle
 var BlunoServiceUUID string = "0000dfb0-0000-1000-8000-00805f9b34fb"
