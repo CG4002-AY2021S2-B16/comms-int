@@ -3,8 +3,8 @@
 #define MUSCLE_SENSOR_INVALID_VAL 1023
 
 // Packet masks
-#define DESIGNATE_DATA_PACKET_MASK 0x30 // 0b00110000, To be ORed with
-#define DESIGNATE_ACK_PACKET_MASK 0xCF // 0b11001111 To be ANDed with
+#define DESIGNATE_DATA_PACKET_MASK 0x0C // 0b0000 1100, To be ORed with
+#define DESIGNATE_ACK_PACKET_MASK 0xF3  // 0b1111 0011 To be ANDed with
 
 
 // Define global variables

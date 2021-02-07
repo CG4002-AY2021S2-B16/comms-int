@@ -249,7 +249,7 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 	}
 }
 
-// determinePacketType returns the packet's type based on the 5th and 6th bit of the 18th byte of the response
+// determinePacketType returns the packet's type based on the 3rd and 4th bit of the 18th byte of the response
 func determinePacketType(d []byte) commsintconfig.PacketType {
 	if d[17]|commsintconfig.RespHandshakeSymbol == commsintconfig.RespHandshakeSymbol {
 		return commsintconfig.Ack
@@ -281,10 +281,19 @@ func calculateChecksum(d []byte) bool {
 	return givenChecksum == c
 }
 
-// formTimestamp takes in a bluno and performs unix timestamp creation
+// formTimestamp takes in a bluno, a packet and performs unix timestamp creation
 func formTimestamp(b *Bluno, resp []byte, start uint8) time.Time {
 	d := time.Millisecond * time.Duration(binary.LittleEndian.Uint32(resp[start:start+4]))
 	return b.HandShakeInit.Add(d)
+}
+
+// getMuscleSensorReading takes in a bluno, a packet and extracts the muscle sensor reading
+// from the lower 8 bits and the 1st and 2nd bit from the 18th byte
+func getMuscleSensorReading(b *Bluno, resp []byte, lower uint8, upper uint8) uint16 {
+	l := resp[lower]
+	h := resp[upper] & commsintconfig.ADCmask
+	log.Printf("[ % X ] -> [ % X ] [ % X ]", resp[upper], h, l)
+	return binary.LittleEndian.Uint16([]byte{l, h})
 }
 
 func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
@@ -298,16 +307,16 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 	}
 
 	return commsintconfig.Packet{
-		Timestamp: formTimestamp(b, resp, 0).UnixNano() / int64(time.Millisecond),
-		X:         twoByteToNum(resp, 4),
-		Y:         twoByteToNum(resp, 6),
-		Z:         twoByteToNum(resp, 8),
-		Yaw:       twoByteToNum(resp, 10),
-		Pitch:     twoByteToNum(resp, 12),
-		Roll:      twoByteToNum(resp, 14),
-		//MuscleSensor: ,
-		Type:        t,
-		BlunoNumber: b.Num,
+		Timestamp:    formTimestamp(b, resp, 0).UnixNano() / int64(time.Millisecond),
+		X:            twoByteToNum(resp, 4),
+		Y:            twoByteToNum(resp, 6),
+		Z:            twoByteToNum(resp, 8),
+		Pitch:        twoByteToNum(resp, 10),
+		Roll:         twoByteToNum(resp, 12),
+		Yaw:          twoByteToNum(resp, 14),
+		MuscleSensor: getMuscleSensorReading(b, resp, 16, 17),
+		Type:         t,
+		BlunoNumber:  b.Num,
 	}
 }
 

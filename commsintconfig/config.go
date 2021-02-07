@@ -3,7 +3,7 @@ package commsintconfig
 import "time"
 
 // DebugMode enables debug log messages
-var DebugMode bool = true
+var DebugMode bool = false
 
 // BlunoServiceUUID is the single (predecided) Service used for Serial communications from the bluno beetle
 var BlunoServiceUUID string = "0000dfb0-0000-1000-8000-00805f9b34fb"
@@ -41,12 +41,15 @@ var InitHandshakeSymbol byte = 'A'
 // RespHandshakeSymbol is the symbol received from a successful handshake attempt
 // We can OR the 17th byte received with this to see if it returns the same value.
 // If so, the packet is indeed an ACK packet.
-var RespHandshakeSymbol byte = 0xCF
+var RespHandshakeSymbol byte = 0xF3
 
 // RespDataSymbol is the symbol received from a successful data response.
 // We can AND the 17th byte received with this to see if it returns the same value.
 // If so, the packet is indeed a Data packet.
-var RespDataSymbol byte = 0x30
+var RespDataSymbol byte = 0x0C
+
+// ADCmask is the mask used to extract upper 2 bits for the 10-bit muscle sensor ADC reading from an incoming packet
+var ADCmask byte = 0x03
 
 // ExpectedPacketSize refers to the number of useful bytes of data within an incoming packet
 var ExpectedPacketSize int = 19
@@ -69,9 +72,9 @@ type Packet struct {
 	X            uint16 `json:"x"`
 	Y            uint16 `json:"y"`
 	Z            uint16 `json:"z"`
-	Yaw          uint16 `json:"yaw"`
 	Pitch        uint16 `json:"pitch"`
 	Roll         uint16 `json:"roll"`
+	Yaw          uint16 `json:"yaw"`
 	MuscleSensor uint16 `json:"muscle_sensor"`
 	Type         PacketType
 	BlunoNumber  uint8 `json:"bluno"`
