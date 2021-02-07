@@ -30,5 +30,5 @@ void loop(){
     // imuSensor.getMotion6(&accelX, &accelY, &accelZ, &gyroX, &gyroY, &gyroZ);
     dataResponse(accelX, accelY, accelZ, gyroX, gyroY, gyroZ);
   }
-  delay(20); // Seems to give 140 correct packets/sec (20 bytes of usable data each), we use this as baseline. Theoretical limit is around 350 packets/sec at 115200 bps
+  delay(20);
 }
