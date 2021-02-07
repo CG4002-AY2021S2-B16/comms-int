@@ -65,7 +65,7 @@ const (
 
 // Packet is constructed from a complete bluetooth response
 type Packet struct {
-	Timestamp    uint64 `json:"timestamp"`
+	Timestamp    int64  `json:"unix_timestamp_milliseconds"`
 	X            uint16 `json:"x"`
 	Y            uint16 `json:"y"`
 	Z            uint16 `json:"z"`
@@ -102,7 +102,7 @@ const (
 var BLEResetString string = "AT+VERSION=?\r\n" //"AT+RESTART\r\n"
 
 // OutputSize refers to the number of packets accumulated before output is sent over to the ext comms interface
-var OutputSize int = 2
+var OutputSize int = 20
 
 // OutputDequeueInterval wakes up the dequeue goroutine to send data over via ext comms interface
 var OutputDequeueInterval time.Duration = 100 * time.Millisecond

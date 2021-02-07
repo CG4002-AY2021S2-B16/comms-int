@@ -282,6 +282,11 @@ func calculateChecksum(d []byte) bool {
 }
 
 // formTimestamp takes in a bluno and performs unix timestamp creation
+func formTimestamp(b *Bluno, resp []byte, start uint8) time.Time {
+	d := time.Millisecond * time.Duration(binary.LittleEndian.Uint32(resp[start:start+4]))
+	return b.HandShakeInit.Add(d)
+}
+
 func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 	if !calculateChecksum(resp) {
 		return commsintconfig.Packet{Type: commsintconfig.Invalid}
@@ -293,13 +298,13 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 	}
 
 	return commsintconfig.Packet{
-		//Timestamp: ,
-		X:     twoByteToNum(resp, 4),
-		Y:     twoByteToNum(resp, 6),
-		Z:     twoByteToNum(resp, 8),
-		Yaw:   twoByteToNum(resp, 10),
-		Pitch: twoByteToNum(resp, 12),
-		Roll:  twoByteToNum(resp, 14),
+		Timestamp: formTimestamp(b, resp, 0).UnixNano() / int64(time.Millisecond),
+		X:         twoByteToNum(resp, 4),
+		Y:         twoByteToNum(resp, 6),
+		Z:         twoByteToNum(resp, 8),
+		Yaw:       twoByteToNum(resp, 10),
+		Pitch:     twoByteToNum(resp, 12),
+		Roll:      twoByteToNum(resp, 14),
 		//MuscleSensor: ,
 		Type:        t,
 		BlunoNumber: b.Num,
