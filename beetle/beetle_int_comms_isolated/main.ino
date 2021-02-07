@@ -1,7 +1,6 @@
 void setup() {
-  delay(1000);
   Serial.begin(115200);
-  delay(1000);
+  delay(200);
 }
 
 
@@ -9,7 +8,9 @@ void loop(){
   receiveData();
   if (new_handshake_req) {
     handshakeResponse();
+    resetTimeOffset();
     handshake_done = true;
+    delay(200);
   } 
   else if (handshake_done) {
     dataResponse();

@@ -31,19 +31,22 @@ var UpstreamNotifBufferSize int = 1000
 
 // Bluno configurations
 var blunoOne bluno.Bluno = bluno.Bluno{
-	Address: "80:30:DC:E9:1C:34",
-	Name:    "BlunoOne",
-	Num:     1,
+	Address:      "80:30:DC:E9:1C:34",
+	Name:         "BlunoOne",
+	Num:          1,
+	HandshakedAt: time.Time{},
 }
 
 var blunoTwo bluno.Bluno = bluno.Bluno{
-	Address: "80:30:DC:D9:0C:B2",
-	Name:    "BlunoTwo",
-	Num:     2,
+	Address:      "80:30:DC:D9:0C:B2",
+	Name:         "BlunoTwo",
+	Num:          2,
+	HandshakedAt: time.Time{},
 }
 
 var blunoThree bluno.Bluno = bluno.Bluno{
-	Address: "80:30:DC:D9:1F:F0",
-	Name:    "BlunoThree",
-	Num:     3,
+	Address:      "80:30:DC:D9:1F:F0",
+	Name:         "BlunoThree",
+	Num:          3,
+	HandshakedAt: time.Time{},
 }

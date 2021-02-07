@@ -1,56 +1,93 @@
 // Packet Specification
-#define PACKET_SIZE 20
+#define PACKET_SIZE 19
+#define MUSCLE_SENSOR_INVALID_VAL 1023
+
+// Packet masks
+#define DESIGNATE_DATA_PACKET_MASK 0x30 // 0b00110000, To be ORed with
+#define DESIGNATE_ACK_PACKET_MASK 0xCF // 0b11001111 To be ANDed with
+
 
 // Define global variables
-char receivedChar;
+uint8_t receivedChar;
 boolean new_handshake_req = false;
 boolean handshake_done = false;
+boolean muscle_sensor_active = false;
+
+// Time
+uint32_t start_time = millis();
 
 // Handshake constants
-char HANDSHAKE_INIT = 'A';
-char HANDSHAKE_RESPONSE = 'B';
-char DATA_RESPONSE = 'C';
+uint8_t HANDSHAKE_INIT = 'A';
 
 // Buffer used to write to bluetooth
-char sendBuffer[PACKET_SIZE + 1];
+uint8_t sendBuffer[PACKET_SIZE];
 
 // Dummy data value
 uint16_t val = 65535; //FFFE
 
 
 /* ---------------------------------
- * COMMS UTILITY FUNCTIONS ARE BELOW
+ * TIME FUNCTIONS
+ * ---------------------------------
+ */
+ 
+void resetTimeOffset() {
+  start_time = millis();
+}
+
+uint32_t calculateTimestamp() {
+  return millis() - start_time;
+}
+
+
+/* ---------------------------------
+ *  BUFFER FUNCTIONS
  * ---------------------------------
  */
 
-
 // clearSendBuffer clears the buffer to be used for populating a packet
 void clearSendBuffer() {
-  memset(sendBuffer, '0', PACKET_SIZE + 1);
-  sendBuffer[PACKET_SIZE] = '\0';
+  memset(sendBuffer, 0, PACKET_SIZE);
 }
 
 
-// fillChecksum calculates and writes the checksum to the outgoing packet
-void fillChecksum() {
-  sendBuffer[19] = '1';
+// setChecksum calculates and writes the checksum to the outgoing packet
+// based on the existing bytes within the sendBuffer
+void setChecksum() {
+  uint8_t checksum_val = 0;
+  
+  for (int i = 0; i < (PACKET_SIZE - 1); i++) {
+    checksum_val ^= sendBuffer[i];
+  }
+  
+  sendBuffer[PACKET_SIZE - 1] = checksum_val;
 }
- 
+
 
 // addIntToBuffer writes an integer as 2 bytes to the buffer
-// It uses big endian e.g. 0x0A0B -> 0A 0B
+// It uses little endian e.g. 0x1A0B -> 0B 1A
 // returns next location after filling in 2 bytes
-char* addIntToBuffer(char* start, uint16_t x) {
-  *start = (x >> 8) & 0xFF;
-  start++;
-  *start = x & 0xFF;
-  start++;
-  return start;
+uint8_t* addIntToBuffer(uint8_t* start, uint16_t x) {
+  for (int i = 0; i < 2; i++) {
+    start[i] = (x >> (i * 8)) & 0xFF;
+  }
+  return start + 2;
 }
 
 
-// Expect fatigue level, etc. in the future
-char* addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t yaw, uint16_t pitch, uint16_t roll) {
+// addLongToBuffer writes a 32-bit integer as 4 bytes to the buffer
+// It uses little endian e.g. 0x0A1B2C3D -> 3D 2C 1B 0A
+// returns next location after filling in 4 bytes
+uint8_t* addLongToBuffer(uint8_t* start, uint32_t x) {
+  for (int i = 0; i < 4; i++) {
+    start[i] = (x >> (i * 8)) & 0xFF; 
+  }
+  return start + 4;
+}
+
+
+// Adds 16-bit IMU data to the buffer 
+uint8_t* addIMUDataToBuffer(uint8_t* next, uint16_t x, uint16_t y, uint16_t z, uint16_t yaw, uint16_t pitch, uint16_t roll) {
   next = addIntToBuffer(next, x);
   next = addIntToBuffer(next, y);
   next = addIntToBuffer(next, z);
@@ -61,23 +98,55 @@ char* addDataToBuffer(char* next, uint16_t x, uint16_t y, uint16_t z, uint16_t y
 }
 
 
+//addMuscleSensorDataToBuffer adds 10-bit Muscle Sensor data to the buffer
+uint8_t* addMuscleSensorDataToBuffer(uint8_t* next, uint16_t ms_val) {
+  if (ms_val == MUSCLE_SENSOR_INVALID_VAL) {
+    ms_val--;
+  }
+  
+  next[0] = ms_val & 0xFF;
+  next[1] = (ms_val >> 8) & 0xFF;
+  return next + 1; // returns the partially filled byte in this case
+}
+
+
+// setDataPacketTypeToBuffer adds 2-bit packet type data to the buffer to designate as data packet
+uint8_t* setDataPacketTypeToBuffer(uint8_t* next) {
+  next[0] |= DESIGNATE_DATA_PACKET_MASK;
+  return next + 1;
+}
+
+
+// setAckPacketTypeToBuffer adds 2-bit packet type data to the buffer to designate as data packet
+uint8_t* setAckPacketTypeToBuffer(uint8_t* next) {
+  next[0] &= DESIGNATE_ACK_PACKET_MASK;
+  return next + 1;
+}
+
+
+/* ---------------------------------
+ *  COMMS FUNCTIONS
+ * ---------------------------------
+ */
+
 // handshakeResponse prepares the buffer to respond to an incoming handshake request
 void handshakeResponse() {
   // Pre-process
   clearSendBuffer();
-  char* buf = sendBuffer;
+  uint8_t* buf = sendBuffer;
   
-  // Process
-  *buf = HANDSHAKE_RESPONSE;
-  char* done = addDataToBuffer(++buf, val, val-1, val-2, val-3, val-4, val-5);
+  // Fill different sections of the buffer
+  buf = addLongToBuffer(buf, calculateTimestamp());
+  buf = addIMUDataToBuffer(buf, val, val-1, val-2, val-3, val-4, val-5);
 
-  // Checksum
-  fillChecksum();
+  uint8_t* partial = (muscle_sensor_active)? addMuscleSensorDataToBuffer(buf, 512) : addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
+  buf = setAckPacketTypeToBuffer(partial);
+
+  // Calculate and fill in checksum
+  setChecksum();
   
   // Send response out
-  Serial.print(sendBuffer);
-  //Serial.write(sendBuffer, PACKET_SIZE);
-
+  Serial.write(sendBuffer, PACKET_SIZE);
 }
 
 
@@ -86,18 +155,20 @@ void dataResponse() {
   // Pre-process
   val -= 1;
   clearSendBuffer();
-  char* buf = sendBuffer;
+  uint8_t* buf = sendBuffer;
   
-  // Process
-  *buf = DATA_RESPONSE;
-  char* done = addDataToBuffer(++buf, val, val-1, val-2, val-3, val-4, val-5);
+  // Fill different sections of the buffer
+  buf = addLongToBuffer(buf, calculateTimestamp());
+  buf = addIMUDataToBuffer(buf, val, val-1, val-2, val-3, val-4, val-5);
 
-  // Checksum
-  fillChecksum();
+  uint8_t* partial = (muscle_sensor_active)? addMuscleSensorDataToBuffer(buf, 512) : addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
+  buf = setDataPacketTypeToBuffer(partial);
+
+  // Calculate and fill in checksum
+  setChecksum();
 
   // Send response out
-  Serial.print(sendBuffer);
-  //Serial.write(sendBuffer, PACKET_SIZE);
+  Serial.write(sendBuffer, PACKET_SIZE);
 }
 
 

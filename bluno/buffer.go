@@ -13,19 +13,17 @@ func (b *Bluno) ReconcilePacket(curr []byte) (commsintconfig.Packet, bool) {
 	// Successful reconciliation if buffer is non-empty, len(prev) + len(curr) == 20, and curr.first is an invalid packetType
 	if b.Buffer.Len() > 0 {
 		prev := b.Buffer.Remove(b.Buffer.Back()).([]byte)
-		if determinePacketType(curr) == commsintconfig.Invalid && (len(prev)+len(curr)) == commsintconfig.ExpectedPacketSize {
+		if (len(prev)+len(curr)) == commsintconfig.ExpectedPacketSize && determinePacketType(append(prev, curr...)) != commsintconfig.Invalid {
 			if commsintconfig.DebugMode {
 				log.Printf("reconcile_packet|success|% x", append(prev, curr...))
 			}
-			return constructPacket(append(prev, curr...), b.Num), true
+			return constructPacket(b, append(prev, curr...)), true
 		}
 		b.Buffer.PushBack(prev)
 	}
-	// Otherwise if the packet appears to be valid, it is likely spliced into 2 pieces
+	// Otherwise the packet it is likely spliced into 2 pieces
 	// Add to buffer if it appears that the currently considered packet can be the first one
-	if determinePacketType(curr) != commsintconfig.Invalid {
-		b.Buffer.PushBack(curr)
-	}
+	b.Buffer.PushBack(curr)
 
 	// Return a default invalid packet (to be discarded unless stored in buffer)
 	return commsintconfig.Packet{Type: commsintconfig.Invalid}, false

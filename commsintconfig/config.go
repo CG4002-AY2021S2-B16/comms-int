@@ -39,13 +39,17 @@ var ClientCharacteristicConfig uint16 = 0x2902
 var InitHandshakeSymbol byte = 'A'
 
 // RespHandshakeSymbol is the symbol received from a successful handshake attempt
-var RespHandshakeSymbol byte = 'B'
+// We can OR the 17th byte received with this to see if it returns the same value.
+// If so, the packet is indeed an ACK packet.
+var RespHandshakeSymbol byte = 0xCF
 
-// RespDataSymbol is the symbol received from a successful data response
-var RespDataSymbol byte = 'C'
+// RespDataSymbol is the symbol received from a successful data response.
+// We can AND the 17th byte received with this to see if it returns the same value.
+// If so, the packet is indeed a Data packet.
+var RespDataSymbol byte = 0x30
 
 // ExpectedPacketSize refers to the number of useful bytes of data within an incoming packet
-var ExpectedPacketSize int = 20
+var ExpectedPacketSize int = 19
 
 // PacketType is an enum type which signifies the type of packet received from the Bluno
 type PacketType uint8
@@ -61,14 +65,16 @@ const (
 
 // Packet is constructed from a complete bluetooth response
 type Packet struct {
-	Type        PacketType
-	X           uint16 `json:"x"`
-	Y           uint16 `json:"y"`
-	Z           uint16 `json:"z"`
-	Yaw         uint16 `json:"yaw"`
-	Pitch       uint16 `json:"pitch"`
-	Roll        uint16 `json:"roll"`
-	BlunoNumber uint8  `json:"bluno"`
+	Timestamp    uint64 `json:"timestamp"`
+	X            uint16 `json:"x"`
+	Y            uint16 `json:"y"`
+	Z            uint16 `json:"z"`
+	Yaw          uint16 `json:"yaw"`
+	Pitch        uint16 `json:"pitch"`
+	Roll         uint16 `json:"roll"`
+	MuscleSensor uint16 `json:"muscle_sensor"`
+	Type         PacketType
+	BlunoNumber  uint8 `json:"bluno"`
 }
 
 // Connection timeout parameters
@@ -96,7 +102,7 @@ const (
 var BLEResetString string = "AT+VERSION=?\r\n" //"AT+RESTART\r\n"
 
 // OutputSize refers to the number of packets accumulated before output is sent over to the ext comms interface
-var OutputSize int = 10
+var OutputSize int = 2
 
 // OutputDequeueInterval wakes up the dequeue goroutine to send data over via ext comms interface
 var OutputDequeueInterval time.Duration = 100 * time.Millisecond

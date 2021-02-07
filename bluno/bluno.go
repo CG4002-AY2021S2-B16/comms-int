@@ -20,6 +20,8 @@ type Bluno struct {
 	Client                 ble.Client `json:"client"`
 	PacketsReceived        uint32     `json:"packets_received"`
 	HandshakeAcknowledged  bool       `json:"handshake_acknowledged"`
+	HandShakeInit          time.Time  `json:"handshake_sent_at"`
+	HandshakedAt           time.Time  `json:"handshake_received_at"`
 	LastPacketReceivedAt   time.Time  `json:"last_packet_received_at"`
 	PacketsImmSuccess      uint32     `json:"packets_immediate_success"`
 	PacketsInvalidType     uint32     `json:"packets_invalid_type"`
@@ -103,7 +105,6 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 		return false
 	}
 
-	time.Sleep(1500 * time.Millisecond)
 	// Handshake
 	log.Printf("Handshake initiated with %s (%s) service=%s char=%s", b.Name, b.Address, s[0].UUID.String(), characteristic.UUID.String())
 	toSend := []byte{commsintconfig.InitHandshakeSymbol, byte('\r'), '\n'}
@@ -111,6 +112,7 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 	if err != nil {
 		log.Printf("write_handshake|err=%s", err)
 	}
+	b.HandShakeInit = time.Now()
 	log.Printf("Handshake sent to %s (%s)|[ %X ]", b.Name, b.Address, toSend)
 
 	// Start tickers
@@ -224,8 +226,10 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 			}
 			b.PacketsReconciled++
 		} else {
-			p = constructPacket(resp, b.Num)
+			p = constructPacket(b, resp)
 		}
+
+		log.Printf("Packet processed %+v for resp [ % X ]\n", p, resp)
 
 		switch p.Type {
 		case commsintconfig.Ack:
@@ -245,11 +249,11 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 	}
 }
 
-// determinePacketType returns the packet's type based on the first byte
+// determinePacketType returns the packet's type based on the 5th and 6th bit of the 18th byte of the response
 func determinePacketType(d []byte) commsintconfig.PacketType {
-	if d[0] == commsintconfig.RespHandshakeSymbol {
+	if d[17]|commsintconfig.RespHandshakeSymbol == commsintconfig.RespHandshakeSymbol {
 		return commsintconfig.Ack
-	} else if d[0] == commsintconfig.RespDataSymbol {
+	} else if d[17]&commsintconfig.RespDataSymbol == commsintconfig.RespDataSymbol {
 		return commsintconfig.Data
 	}
 	return commsintconfig.Invalid
@@ -258,19 +262,47 @@ func determinePacketType(d []byte) commsintconfig.PacketType {
 // twoByteToNum converts 2 consecutive bytes into a uint16
 // it assumes the bytes are arranged in little endian format
 func twoByteToNum(d []byte, start uint8) uint16 {
-	return binary.BigEndian.Uint16(d[start : start+2])
+	return binary.LittleEndian.Uint16(d[start : start+2])
 }
 
-func constructPacket(resp []byte, blunoNum uint8) commsintconfig.Packet {
+// calculateChecksum takes a complete packet and finds its checksum
+// returns true if checksum passes otherwise false
+func calculateChecksum(d []byte) bool {
+	givenChecksum := d[commsintconfig.ExpectedPacketSize-1]
+	var c byte = 0x00
+
+	for i := 0; i < commsintconfig.ExpectedPacketSize-1; i++ {
+		c ^= d[i]
+	}
+
+	if commsintconfig.DebugMode {
+		log.Printf("Checksum calculated for [ % X ] : %t \n", d, givenChecksum == c)
+	}
+	return givenChecksum == c
+}
+
+// formTimestamp takes in a bluno and performs unix timestamp creation
+func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
+	if !calculateChecksum(resp) {
+		return commsintconfig.Packet{Type: commsintconfig.Invalid}
+	}
+
+	t := determinePacketType(resp)
+	if t == commsintconfig.Ack {
+		b.HandshakedAt = time.Now()
+	}
+
 	return commsintconfig.Packet{
-		Type:        determinePacketType(resp),
-		X:           twoByteToNum(resp, 1),
-		Y:           twoByteToNum(resp, 3),
-		Z:           twoByteToNum(resp, 5),
-		Yaw:         twoByteToNum(resp, 7),
-		Pitch:       twoByteToNum(resp, 9),
-		Roll:        twoByteToNum(resp, 11),
-		BlunoNumber: blunoNum,
+		//Timestamp: ,
+		X:     twoByteToNum(resp, 4),
+		Y:     twoByteToNum(resp, 6),
+		Z:     twoByteToNum(resp, 8),
+		Yaw:   twoByteToNum(resp, 10),
+		Pitch: twoByteToNum(resp, 12),
+		Roll:  twoByteToNum(resp, 14),
+		//MuscleSensor: ,
+		Type:        t,
+		BlunoNumber: b.Num,
 	}
 }
 
