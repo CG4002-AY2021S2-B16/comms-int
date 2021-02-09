@@ -5,6 +5,9 @@ import "time"
 // DebugMode enables debug log messages
 var DebugMode bool = false
 
+// FineDebugMode enables debug mode at a stricter level
+var FineDebugMode bool = DebugMode || true
+
 // BlunoServiceUUID is the single (predecided) Service used for Serial communications from the bluno beetle
 var BlunoServiceUUID string = "0000dfb0-0000-1000-8000-00805f9b34fb"
 

@@ -25,10 +25,6 @@ func main() {
 	ble.SetDefaultDevice(d)
 	defer d.Stop()
 
-	// Only one BT Client connection can be performed at a time safely via a single device
-	// Use a FIFO Semaphore (channel of size 1 in golang to ensure non-starvation in reconnection queue)
-	clientCreation := make(chan bool, 1)
-
 	// Setup application state and upstream connection
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -67,7 +63,7 @@ func main() {
 				go outBuf.DequeueProcessor(as.MasterCtx, us)
 
 				// Start application
-				go startApp(as, outBuf.EnqueueBuffer, clientCreation)
+				go startApp(as, outBuf.EnqueueBuffer)
 
 			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamPauseMsg {
 				as.MasterCtxCancel()
@@ -75,11 +71,15 @@ func main() {
 				as.SetState(commsintconfig.Waiting)
 			}
 		}
+		log.Printf("Application is now in state %d", as.GetState())
 	}
 }
 
-func startApp(as *appstate.AppState, wr func(commsintconfig.Packet), m chan bool) {
-	m <- true
+func startApp(as *appstate.AppState, wr func(commsintconfig.Packet)) {
+	// Only one BT Client connection can be performed at a time safely via a single device
+	// Use a FIFO Semaphore (channel of size 1 in golang to ensure non-starvation in reconnection queue)
+	clientCreation := make(chan bool, 1)
+	clientCreation <- true
 	wg := sync.WaitGroup{}
 
 	for _, bs := range as.BlunoStates {
@@ -93,11 +93,32 @@ func startApp(as *appstate.AppState, wr func(commsintconfig.Packet), m chan bool
 
 		go func(blno *bluno.Bluno) {
 			log.Printf("Master goroutine started for %s, addr=%s, stateUpdateChan=%v", blno.Name, blno.Address, blno.StateUpdateChan)
+			var connected bool = false
+
 			for {
-				success := blno.Connect(as.MasterCtx, m)
-				if success {
-					if listenCancel := blno.Listen(as.MasterCtx, &wg, wr); listenCancel {
+				connChan := make(chan bool, 1)
+				if !connected {
+					go blno.Connect(as.MasterCtx, clientCreation, connChan)
+
+					select {
+					case success := <-connChan:
+						connected = success
+					case <-as.MasterCtx.Done():
+						<-connChan // Await safe termination of connect attempt
+						log.Println("what:", clientCreation)
+						wg.Done()
 						return
+					}
+				} else {
+					go blno.Listen(as.MasterCtx, wr, connChan)
+
+					select {
+					case success := <-connChan:
+						if success {
+							wg.Done()
+							return
+						}
+						connected = false
 					}
 				}
 			}
@@ -106,5 +127,6 @@ func startApp(as *appstate.AppState, wr func(commsintconfig.Packet), m chan bool
 
 	log.Println("Waiting on goroutines...")
 	wg.Wait()
+	<-clientCreation // Drain the HCI mutex
 	log.Println("All goroutines finalized. Exiting...")
 }

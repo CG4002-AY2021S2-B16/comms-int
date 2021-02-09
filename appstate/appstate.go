@@ -3,6 +3,7 @@ package appstate
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -84,7 +85,7 @@ func (a *AppState) MonitorBlunos() {
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Println("---- BLUNO STATUS REPORT ----")
+			log.Println("---- BLUNO STATUS REPORT ----")
 
 			for _, b := range a.BlunoStates {
 				stat := b.FetchBlunoStatus()
@@ -99,7 +100,7 @@ func (a *AppState) MonitorBlunos() {
 				}
 			}
 
-			fmt.Println("---- END OF BLUNO STATUS REPORT ----")
+			log.Println("---- END OF BLUNO STATUS REPORT ----")
 		}
 	}
 

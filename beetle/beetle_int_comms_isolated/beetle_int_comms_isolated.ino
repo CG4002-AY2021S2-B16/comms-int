@@ -95,11 +95,7 @@ uint8_t* addIMUDataToBuffer(uint8_t* next, uint16_t x, uint16_t y, uint16_t z, u
 
 
 //addMuscleSensorDataToBuffer adds 10-bit Muscle Sensor data to the buffer
-uint8_t* addMuscleSensorDataToBuffer(uint8_t* next, uint16_t ms_val) {
-  if (ms_val == MUSCLE_SENSOR_INVALID_VAL) {
-    ms_val--;
-  }
-  
+uint8_t* addMuscleSensorDataToBuffer(uint8_t* next, uint16_t ms_val) {  
   next[0] = ms_val & 0xFF;
   next[1] = (ms_val >> 8) & 0xFF;
   return next + 1; // returns the partially filled byte in this case

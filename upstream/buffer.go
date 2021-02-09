@@ -3,6 +3,7 @@ package upstream
 import (
 	"container/list"
 	"context"
+	"log"
 	"sync"
 	"time"
 
@@ -39,6 +40,7 @@ func (o *OutputBuffer) EnqueueChannelProcessor(ctx context.Context) {
 			o.L.PushBack(p)
 			o.Unlock()
 		case <-ctx.Done():
+			log.Println("Shutting down EnqueueChannelProcessor")
 			return
 		}
 	}
@@ -63,6 +65,7 @@ func (o *OutputBuffer) DequeueProcessor(ctx context.Context, us *IOHandler) {
 			}
 			o.Unlock()
 		case <-ctx.Done():
+			log.Println("Shutting down DequeueProcessor")
 			return
 		}
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/CG4002-AY2021S2-B16/comms-int/commsintconfig"
@@ -36,19 +35,29 @@ type Bluno struct {
 // - Remember to close client when done
 // - Remember to check disconnected before interacting with channel
 // - To be run inside a goroutine
-func (b *Bluno) Connect(pCtx context.Context, m chan bool) bool {
+func (b *Bluno) Connect(pCtx context.Context, m chan bool, done chan bool) {
 	// Dial to Bluno
+	if commsintconfig.FineDebugMode {
+		log.Printf("Entering HCI critical region: %s", b.Name)
+	}
+
 	<-m
 	timedCtx, cancel := context.WithTimeout(pCtx, commsintconfig.ConnectionEstablishTimeout)
 	defer cancel()
 	client, err := ble.Dial(timedCtx, ble.NewAddr(b.Address))
 	m <- true
+
+	if commsintconfig.FineDebugMode {
+		log.Printf("Exiting HCI critical region: %s", b.Name)
+	}
+
 	if err != nil {
 		if commsintconfig.DebugMode {
 			log.Printf("client_connection_fail|addr=%s|err=%s", b.Address, err)
 		}
 		time.Sleep(2 * time.Second) // Sleep fixed duration to induce predictability and allow other connection attempts
-		return false
+		done <- false
+		return
 	}
 
 	b.SetClient(&client)
@@ -56,12 +65,12 @@ func (b *Bluno) Connect(pCtx context.Context, m chan bool) bool {
 	if commsintconfig.DebugMode {
 		log.Printf("client_connection_succeeded|addr=%s", b.Address)
 	}
-	return true
+	done <- true
 }
 
 // Listen receives incoming connections from bluno
 // - to be called inside a goroutine
-func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsintconfig.Packet)) bool {
+func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), done chan bool) {
 	defer b.Client.CancelConnection()
 
 	// Perform targeted find of characteristic
@@ -75,7 +84,8 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 		if commsintconfig.DebugMode {
 			log.Printf("client_svc_discovery_err|addr=%s|err=%s|len_svcs=%d", b.Address, err, len(s))
 		}
-		return false
+		done <- false
+		return
 	}
 
 	// Isolate the characteristic
@@ -84,7 +94,8 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 		if commsintconfig.DebugMode {
 			log.Printf("client_char_discovery_err|addr=%s|err=%s|num_characteristics=%d", b.Address, err, len(c))
 		}
-		return false
+		done <- false
+		return
 	}
 
 	// Add 2902 descriptor, because its missing from Bluno: https://www.dfrobot.com/forum/viewtopic.php?t=2035
@@ -102,7 +113,8 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 		if commsintconfig.DebugMode {
 			log.Printf("client_subscription_err|addr=%s|err=%s", b.Address, err)
 		}
-		return false
+		done <- false
+		return
 	}
 
 	// Handshake
@@ -126,12 +138,13 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 			b.StateUpdateChan <- commsintconfig.NotConnected
 			log.Printf("client_connection_disconnected|addr=%s", b.Address)
 			//b.PrintStats()
-			return false
+			done <- false
+			return
 		case <-hsFail:
 			log.Printf("client_handshake_fail|addr=%s", b.Address)
 			b.Client.Unsubscribe(characteristic, false)
-			return false
-
+			done <- false
+			return
 		case t := <-tickChan.C:
 			diff := t.Sub(b.LastPacketReceivedAt)
 			if b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionLivenessTimeout {
@@ -143,10 +156,14 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 					t,
 				)
 				b.StateUpdateChan <- commsintconfig.NotConnected
-				return false
+				done <- false
+				return
 			}
 		case et := <-establishTickChan.C:
-			log.Printf("time_check|et=%s", et.String())
+			if commsintconfig.DebugMode {
+				log.Printf("time_check|et=%s", et.String())
+			}
+
 			diff := et.Sub(b.LastPacketReceivedAt)
 			if !b.HandshakeAcknowledged && diff >= 5*commsintconfig.ConnectionEstablishTimeout {
 				log.Printf(
@@ -156,7 +173,8 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 					et,
 				)
 				b.StateUpdateChan <- commsintconfig.NotConnected
-				return false
+				done <- false
+				return
 			}
 			// } else if !b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionEstablishTimeout {
 			// 	// We attempt a reset of built in BLE chip
@@ -197,8 +215,8 @@ func (b *Bluno) Listen(pCtx context.Context, wg *sync.WaitGroup, wr func(commsin
 			//b.PrintStats()
 			b.StateUpdateChan <- commsintconfig.NotConnected
 			b.Client.ClearSubscriptions()
-			wg.Done()
-			return true
+			done <- true
+			return
 		}
 	}
 }
@@ -229,7 +247,9 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 			p = constructPacket(b, resp)
 		}
 
-		log.Printf("Packet processed %+v for resp [ % X ]\n", p, resp)
+		if commsintconfig.DebugMode {
+			log.Printf("Packet processed %+v for resp [ % X ]\n", p, resp)
+		}
 
 		switch p.Type {
 		case commsintconfig.Ack:
@@ -292,7 +312,6 @@ func formTimestamp(b *Bluno, resp []byte, start uint8) time.Time {
 func getMuscleSensorReading(b *Bluno, resp []byte, lower uint8, upper uint8) uint16 {
 	l := resp[lower]
 	h := resp[upper] & commsintconfig.ADCmask
-	log.Printf("[ % X ] -> [ % X ] [ % X ]", resp[upper], h, l)
 	return binary.LittleEndian.Uint16([]byte{l, h})
 }
 
