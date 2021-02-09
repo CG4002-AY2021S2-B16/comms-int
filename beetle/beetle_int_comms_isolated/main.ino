@@ -1,5 +1,6 @@
-int16_t accelX, accelY, accelZ;
-int16_t gyroX, gyroY, gyroZ;
+// Dynamically changing dummy data value
+int16_t dummy_val = 32767;
+int16_t neg_dummy_val = -32768;
 
 
 void setup() {
@@ -27,9 +28,9 @@ void loop(){
     delay(500);
   } 
   else if (handshake_done) {
-    // imuSensor.getMotion6(&accelX, &accelY, &accelZ, &gyroX, &gyroY, &gyroZ);
-    // dataResponse(accelX, accelY, accelZ, gyroX, gyroY, gyroZ);
-    dataResponse(32100, -32100, 32000, -32000, 0, -0);
+    dataResponse(0, -0, dummy_val, neg_dummy_val, dummy_val + neg_dummy_val, -500);
+    dummy_val--;
+    neg_dummy_val++;
   }
   delay(20);
 }

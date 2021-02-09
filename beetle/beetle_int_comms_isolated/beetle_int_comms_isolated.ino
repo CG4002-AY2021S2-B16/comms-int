@@ -21,8 +21,6 @@ uint32_t start_time = millis();
 // Buffer used to write to bluetooth
 uint8_t sendBuffer[PACKET_SIZE];
 
-// Dynamically changing dummy data value
-uint16_t dummy_val = 65535;
 
 /* ---------------------------------
  * TIME FUNCTIONS
@@ -135,7 +133,7 @@ void handshakeResponse() {
   
   // Fill different sections of the buffer
   buf = addLongToBuffer(buf, calculateTimestamp());
-  buf = addIMUDataToBuffer(buf, dummy_val, dummy_val-1, dummy_val-2, dummy_val-3, dummy_val-4, dummy_val-5);
+  buf = addIMUDataToBuffer(buf, 0, -0, 32767, -32768, 100, -100); // Arbitrary values to verify signed transmission integrity
 
   uint8_t* partial = addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
   buf = setAckPacketTypeToBuffer(partial);
