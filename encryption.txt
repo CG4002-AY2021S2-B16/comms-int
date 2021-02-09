@@ -1,0 +1,107 @@
+
+Goal: Encrypt 19 bytes
+
+Packet type is:
+
+4 Timestamp bytes
+15 other data bytes
+
+
+
+Idea #1
+
+AES-ECB takes in a 16-byte input and provides a 16-byte output.
+
+Limitations:
+
+AES-ECB does a 1:1 mapping of plaintext to ciphertext
+	
+- if two plaintext are ever the same, it is easy to pattern match and perform a dictionary attack
+
+However, it is secure if input plaintext is always unique.
+
+----------------------------------------------------------------------------------
+
+1. Laptop and Beetle have a hardcoded AES encrypt/decrypt key, K
+
+2. with K, encrypt absolute timestamp + 12 other bytes
+
+Output = 16 encrypted bytes + 3 unencrypted (packet type, checksum, muscle sensor exposed)
+
+
+Notes:
+
+With an absolute timestamp at millisecond resolution, key needs to be changed every 50 days
+
+----------------------------------------------------------------------------------
+
+
+Idea #2
+
+Use aes-gcm with timestamp + padding as nonce IV
+
+send timestamp (plaintext) + 16 bytes encrypted
+
+ Notes:
+
+With an absolute timestamp at millisecond resolution, key needs to be changed every 50 days
+
+-------------------------------------------------------------------------------------
+
+
+
+
+Resources:
+
+https://crypto.stackexchange.com/questions/2963/is-ecb-mode-secure-if-plaintexts-are-guaranteed-to-be-unique
+
+https://arduino.stackexchange.com/questions/52218/arduino-aes128-cmac
+https://github.com/rweather/arduinolibs or https://github.com/OperatorFoundation/Crypto/commits/master
+
+https://github.com/opentrv/OTAESGCM
+
+https://crypto.stackexchange.com/questions/41665/using-a-block-cipher-with-timestamp-instead-of-counter
+
+https://tls.mbed.org/api/aes_8h.html#a0e59fdda18a145e702984268b9ab291a
+
+https://crypto.stackexchange.com/questions/57645/is-using-the-same-iv-in-aes-similar-to-not-using-an-iv-in-the-first-place
+
+https://security.stackexchange.com/questions/21371/decryption-on-aes-when-the-same-key-and-iv-are-used
+
+
+https://crypto.stackexchange.com/questions/21217/encryption-for-a-short-packet-size
+
+https://crypto.stackexchange.com/questions/7951/aesctrhmac-encryption-and-authentication-on-an-arduino
+
+https://crypto.stackexchange.com/questions/85571/disadvantages-of-aes-ctr
+
+https://crypto.stackexchange.com/questions/42927/encrypting-small-packets-with-low-data-rate
+
+https://devzone.nordicsemi.com/nordic/nordic-blog/b/blog/posts/simple-application-level-authentication
+
+https://crypto.stackexchange.com/questions/85540/is-tea-suitable-for-encrypting-authenticating-many-short-messages
+
+https://crypto.stackexchange.com/questions/85540/is-tea-suitable-for-encrypting-authenticating-many-short-messages
+
+https://www.cryptolux.org/index.php/Lightweight_Authenticated_Encryption
+
+https://github.com/ascon/ascon-c/tree/master/crypto_aead/ascon128v12/ref
+
+https://www.lysator.liu.se/~nisse/nettle/nettle.html#Introduction
+
+https://crypto.stackexchange.com/questions/31835/why-is-aes-siv-not-used-but-aeskw-akw1
+
+https://crypto.stackexchange.com/questions/76809/what-are-the-popular-modes-of-operation-aes-gcm-aes-siv-aes-gcm-siv-etc-ge
+
+https://github.com/Shay-Gueron/AES-GCM-SIV/tree/master/AES_GCM_SIV_128/AES_GCM_SIV_128_C_Intrinsics_Code
+
+https://www.codeproject.com/Articles/21877/Applied-Crypto-Block-Ciphers
+
+https://en.wikipedia.org/wiki/Ciphertext_stealing
+
+https://github.com/calccrypto/Encryptions
+
+http://cryptowiki.net/index.php?title=Electronic_Code_Book_(ECB)
+
+https://github.com/OP-TEE/optee_os/blob/master/core/crypto/aes-cts.c
+
