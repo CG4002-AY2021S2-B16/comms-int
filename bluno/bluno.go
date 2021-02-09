@@ -261,8 +261,8 @@ func determinePacketType(d []byte) commsintconfig.PacketType {
 
 // twoByteToNum converts 2 consecutive bytes into a uint16
 // it assumes the bytes are arranged in little endian format
-func twoByteToNum(d []byte, start uint8) uint16 {
-	return binary.LittleEndian.Uint16(d[start : start+2])
+func twoByteToNum(d []byte, start uint8) int16 {
+	return int16(binary.LittleEndian.Uint16(d[start : start+2]))
 }
 
 // calculateChecksum takes a complete packet and finds its checksum

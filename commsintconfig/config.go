@@ -69,12 +69,12 @@ const (
 // Packet is constructed from a complete bluetooth response
 type Packet struct {
 	Timestamp    int64  `json:"unix_timestamp_milliseconds"`
-	X            uint16 `json:"x"`
-	Y            uint16 `json:"y"`
-	Z            uint16 `json:"z"`
-	Pitch        uint16 `json:"pitch"`
-	Roll         uint16 `json:"roll"`
-	Yaw          uint16 `json:"yaw"`
+	X            int16  `json:"x"`
+	Y            int16  `json:"y"`
+	Z            int16  `json:"z"`
+	Pitch        int16  `json:"pitch"`
+	Roll         int16  `json:"roll"`
+	Yaw          int16  `json:"yaw"`
 	MuscleSensor uint16 `json:"muscle_sensor"`
 	Type         PacketType
 	BlunoNumber  uint8 `json:"bluno"`
