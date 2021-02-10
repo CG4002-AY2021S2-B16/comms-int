@@ -6,7 +6,8 @@ int16_t neg_dummy_val = -32768;
 void setup() {
   // // Initialize the i2c wire connection
   // Wire.begin();
-  
+
+  prepareAES();
   Serial.begin(115200);
   delay(1000);
 

@@ -1,9 +1,13 @@
 package commsintconfig
 
-import "time"
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"time"
+)
 
 // DebugMode enables debug log messages
-var DebugMode bool = false
+var DebugMode bool = true
 
 // FineDebugMode enables debug mode at a stricter level
 var FineDebugMode bool = DebugMode || true
@@ -126,3 +130,16 @@ const (
 	// Transmitting refers to a bluno that is connected and transmitting data
 	Transmitting BlunoStatus = 2
 )
+
+// AESSize refers to the standard size of the buffers used
+var AESSize int = 16
+
+// StageTwoOffset refers to the offset at which the second layer of encryption is performed
+var StageTwoOffset int = 2
+
+// CreateBlockCiphers creates 2 decryption ciphers to decrypt a packet
+func CreateBlockCiphers() (cipher.Block, cipher.Block) {
+	cOne, _ := aes.NewCipher([]byte{0x2A, 0x46, 0x2D, 0x4A, 0x61, 0x4E, 0x64, 0x52, 0x67, 0x55, 0x6A, 0x58, 0x6E, 0x32, 0x72, 0x35})
+	cTwo, _ := aes.NewCipher([]byte{0x7A, 0x24, 0x43, 0x26, 0x46, 0x29, 0x4A, 0x40, 0x4E, 0x63, 0x52, 0x66, 0x55, 0x6A, 0x57, 0x6E})
+	return cOne, cTwo
+}

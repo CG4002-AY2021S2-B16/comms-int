@@ -301,6 +301,23 @@ func calculateChecksum(d []byte) bool {
 	return givenChecksum == c
 }
 
+// decryptPacket takes an encrypted complete packet and performs
+// aes decryption in the following manner:
+// enc -> decrypt bytes 2 to 17 using stage 2 AES key
+// decrypt bytes 0 to 15 using stage 1 AES key
+func decryptPacket(resp []byte) []byte {
+	temp := make([]byte, commsintconfig.AESSize)
+	cOne, cTwo := commsintconfig.CreateBlockCiphers()
+
+	// StageTwoDecryptor is used to decrypt the packet from stage 2 (second group of 16 bytes are encrypted) to stage 1 (first 16 bytes are encrypted)
+	cTwo.Decrypt(temp, resp[commsintconfig.StageTwoOffset:commsintconfig.StageTwoOffset+commsintconfig.AESSize])
+	stageTwo := append(append(resp[:commsintconfig.StageTwoOffset], temp...), resp[commsintconfig.ExpectedPacketSize-1])
+
+	// StageOneDecryptor is used to decrypt the packet from stage 1 (first 16 bytes are encrypted) to stage 0 (plaintext)
+	cOne.Decrypt(temp, stageTwo)
+	return append(temp, stageTwo[commsintconfig.AESSize:]...)
+}
+
 // formTimestamp takes in a bluno, a packet and performs unix timestamp creation
 func formTimestamp(b *Bluno, resp []byte, start uint8) time.Time {
 	d := time.Millisecond * time.Duration(binary.LittleEndian.Uint32(resp[start:start+4]))
@@ -319,6 +336,8 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 	if !calculateChecksum(resp) {
 		return commsintconfig.Packet{Type: commsintconfig.Invalid}
 	}
+
+	resp = decryptPacket(resp)
 
 	t := determinePacketType(resp)
 	if t == commsintconfig.Ack {
