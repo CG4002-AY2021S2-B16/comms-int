@@ -50,3 +50,17 @@ var blunoThree bluno.Bluno = bluno.Bluno{
 	Num:          3,
 	HandshakedAt: time.Time{},
 }
+
+var blunoFour bluno.Bluno = bluno.Bluno{
+	Address:      "34:B1:F7:D2:37:0C",
+	Name:         "BlunoFour",
+	Num:          4,
+	HandshakedAt: time.Time{},
+}
+
+var blunoFive bluno.Bluno = bluno.Bluno{
+	Address:      "80:30:DC:D9:23:4C",
+	Name:         "BlunoFive",
+	Num:          5,
+	HandshakedAt: time.Time{},
+}
