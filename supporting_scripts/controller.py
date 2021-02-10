@@ -2,7 +2,8 @@ import json
 import socket
 import os
 import threading
-import time
+import datetime
+import csv
 
 NOTIF_SOCK_PATH = "/tmp/www/comms/notif.sock"
 DATA_SOCK_PATH = "/tmp/www/comms/data.sock"
@@ -42,10 +43,24 @@ def read_ble_data():
     os.chmod(NOTIF_SOCK_PATH, 0o777)
     client.connect(DATA_SOCK_PATH)
 
-    while True:
-        # the logic needs to be much more complex here
-        print("Waiting...")
-        print(client.recv(4096))
+    with open(f'data_{datetime.datetime.now()}.csv', mode='w') as csv_file:
+        sensor_writer = csv.writer(csv_file)
+        first_row = True
+
+        while True:
+            # the logic needs to be much more complex here
+            print("Waiting...")
+            d = client.recv(4096)
+            
+            try:
+                parsed = json.loads(d)
+                for item in parsed:
+                    if first_row:
+                        sensor_writer.writerow(item.keys())
+                        first_row = False
+                    sensor_writer.writerow(item.values())
+            except json.JSONDecodeError:
+                pass
 
     client.close()
 
