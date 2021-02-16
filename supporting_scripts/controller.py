@@ -46,12 +46,17 @@ def read_ble_data():
     with open(f'data_{datetime.datetime.now()}.csv', mode='w') as csv_file:
         sensor_writer = csv.writer(csv_file)
         first_row = True
+        print("Waiting...")
 
         while True:
             # the logic needs to be much more complex here
-            print("Waiting...")
             d = client.recv(4096)
             
+            # connection has closed
+            if len(d) == 0:
+                print("Connection closed. Exiting...")
+                break
+
             try:
                 parsed = json.loads(d)
                 for item in parsed:

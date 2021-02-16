@@ -33,5 +33,5 @@ void loop(){
     dummy_val--;
     neg_dummy_val++;
   }
-  delay(20);
+  delay(7);
 }
