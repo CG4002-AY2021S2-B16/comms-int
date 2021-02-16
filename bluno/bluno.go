@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"log"
 	"time"
 
@@ -137,7 +138,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 		case <-b.Client.Disconnected():
 			b.StateUpdateChan <- commsintconfig.NotConnected
 			log.Printf("client_connection_disconnected|addr=%s", b.Address)
-			//b.PrintStats()
+			b.PrintStats()
 			done <- false
 			return
 		case <-hsFail:
@@ -148,7 +149,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 		case t := <-tickChan.C:
 			diff := t.Sub(b.LastPacketReceivedAt)
 			if b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionLivenessTimeout {
-				//b.PrintStats()
+				b.PrintStats()
 				log.Printf(
 					"client_connection_terminated|liveness_ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
 					b.PacketsReceived,
@@ -212,7 +213,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 			// }
 		case <-pCtx.Done():
 			log.Printf("client_connection_terminated|force=true|packets received=%d", b.PacketsReceived)
-			//b.PrintStats()
+			b.PrintStats()
 			b.StateUpdateChan <- commsintconfig.NotConnected
 			b.Client.ClearSubscriptions()
 			done <- true
@@ -294,10 +295,6 @@ func calculateChecksum(d []byte) bool {
 	for i := 0; i < commsintconfig.ExpectedPacketSize-1; i++ {
 		c ^= d[i]
 	}
-
-	if commsintconfig.DebugMode {
-		log.Printf("Checksum calculated for [ % X ] : %t \n", d, givenChecksum == c)
-	}
 	return givenChecksum == c
 }
 
@@ -363,23 +360,10 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 // -> implies each packet is between 248 - 328 bits
 // -> implies up to 351 - 464 packets can be received per second
 func (b *Bluno) PrintStats() {
+	fmt.Printf("--------------------------------\nPrinting statistics for %s\n--------------------------------\n", b.Name)
 	elapsedTime := time.Now().Sub(b.StartTime).Seconds()
-	log.Printf(
-		"print_stats_pre_reconciliation|successful_packets=%d|elapsed_time=%f|effective_packets_per_second=%f",
-		b.PacketsImmSuccess,
-		elapsedTime,
-		float64(b.PacketsImmSuccess)/elapsedTime,
-	)
-	log.Printf(
-		"print_stats_pre_reconciliation|success_ratio=%f|incorrect_length_ratio=%f|invalid_data_ratio=%f",
-		float64(b.PacketsImmSuccess)/float64(b.PacketsReceived),
-		float64(b.PacketsIncorrectLength)/float64(b.PacketsReceived),
-		float64(b.PacketsInvalidType)/float64(b.PacketsReceived),
-	)
 
-	// Print absolute numbers
-	log.Printf(
-		"print_stats_post_reconciliation|packets_received=%d|immediately_successful_packets=%d|reconciled_packets=%d|invalid_packets=%d|incorrect_length_packets=%d",
+	fmt.Printf("Received: %d\nImmediately successful: %d\nReconciled: %d\nInvalid: %d\nIncorrect length: %d\n\n",
 		b.PacketsReceived,
 		b.PacketsImmSuccess,
 		b.PacketsReconciled,
@@ -387,24 +371,35 @@ func (b *Bluno) PrintStats() {
 		b.PacketsIncorrectLength,
 	)
 
+	fmt.Println("Before fragmentated packet reconciliation:")
+	fmt.Printf("Successful Packets: %d\nElapsed time since connection: %f\nEffective packets per second: %f\n",
+		b.PacketsImmSuccess,
+		elapsedTime,
+		float64(b.PacketsImmSuccess)/elapsedTime,
+	)
+	fmt.Printf("Successful packet ratio: %f\nIncorrect length ratio: %f\nInvalid data ratio: %f\n\n",
+		float64(b.PacketsImmSuccess)/float64(b.PacketsReceived),
+		float64(b.PacketsIncorrectLength)/float64(b.PacketsReceived),
+		float64(b.PacketsInvalidType)/float64(b.PacketsReceived),
+	)
+
+	fmt.Println("After fragmentated packet reconciliation:")
 	// Reconciliation causes extra 1 InvalidType, 1 IncorrectLength and 1 PacketReceived
 	adjIncorrectLength := float64(b.PacketsIncorrectLength - 2*b.PacketsReconciled)
 	adjSuccessfulPackets := float64(b.PacketsImmSuccess + b.PacketsReconciled)
 
-	log.Printf(
-		"print_stats_post_reconciliation|successful_packets=%f|elapsed_time=%f|effective_packets_per_second=%f",
-		adjSuccessfulPackets,
+	fmt.Printf("Successful Packets: %d\nElapsed time since connection: %f\nEffective packets per second: %f\n",
+		int(adjSuccessfulPackets),
 		elapsedTime,
 		adjSuccessfulPackets/elapsedTime,
 	)
 
-	log.Printf(
-		"print_stats_post_reconciliation|success_ratio=%f|incorrect_length_ratio=%f|invalid_data_ratio=%f",
+	fmt.Printf("Successful packet ratio: %f\nIncorrect length ratio: %f\nInvalid data ratio: %f\n\n",
 		adjSuccessfulPackets/float64(b.PacketsReceived),
 		float64(adjIncorrectLength)/float64(b.PacketsReceived),
 		float64(b.PacketsInvalidType)/float64(b.PacketsReceived),
 	)
-
+	fmt.Printf("--------------------------------\nEnd of statistics for %s\n--------------------------------", b.Name)
 }
 
 // SetClient attaches an active client to the given bluno, and resets its statistics e.g. transmission counters
