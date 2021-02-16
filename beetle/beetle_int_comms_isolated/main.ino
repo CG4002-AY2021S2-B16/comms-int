@@ -26,6 +26,7 @@ void loop(){
     handshakeResponse();
     resetTimeOffset();
     handshake_done = true;
+    Serial.flush();
     delay(500);
   } 
   else if (handshake_done) {

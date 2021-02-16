@@ -117,6 +117,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 		done <- false
 		return
 	}
+	defer b.Client.Unsubscribe(characteristic, false)
 
 	// Handshake
 	log.Printf("Handshake initiated with %s (%s) service=%s char=%s", b.Name, b.Address, s[0].UUID.String(), characteristic.UUID.String())
@@ -143,7 +144,6 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 			return
 		case <-hsFail:
 			log.Printf("client_handshake_fail|addr=%s", b.Address)
-			b.Client.Unsubscribe(characteristic, false)
 			done <- false
 			return
 		case t := <-tickChan.C:
@@ -166,7 +166,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 			}
 
 			diff := et.Sub(b.LastPacketReceivedAt)
-			if !b.HandshakeAcknowledged && diff >= 5*commsintconfig.ConnectionEstablishTimeout {
+			if !b.HandshakeAcknowledged && diff >= 2*commsintconfig.ConnectionEstablishTimeout {
 				log.Printf(
 					"client_connection_terminated|establish_ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
 					b.PacketsReceived,
@@ -317,8 +317,9 @@ func decryptPacket(resp []byte) []byte {
 
 // formTimestamp takes in a bluno, a packet and performs unix timestamp creation
 func formTimestamp(b *Bluno, resp []byte, start uint8) time.Time {
-	d := time.Millisecond * time.Duration(binary.LittleEndian.Uint32(resp[start:start+4]))
-	return b.HandShakeInit.Add(d)
+	ts := time.Millisecond * time.Duration(binary.LittleEndian.Uint32(resp[start:start+4]))
+	delta := time.Duration(int64(b.HandshakedAt.Sub(b.HandShakeInit)) / 2)
+	return b.HandShakeInit.Add(delta).Add(ts)
 }
 
 // getMuscleSensorReading takes in a bluno, a packet and extracts the muscle sensor reading

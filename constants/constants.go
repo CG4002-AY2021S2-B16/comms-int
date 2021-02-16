@@ -17,7 +17,7 @@ var OutgoingDataSock string = "/tmp/www/comms/data.sock"
 // UpstreamCheckFreq decides how often upstream is checked for incoming messages
 var UpstreamCheckFreq time.Duration = 300 * time.Millisecond
 
-// BlunoStatusCheckFreq decides how often blunos are checked for their statuses
+// BlunoStatusCheckFreq decides how often blunostates are monitored
 var BlunoStatusCheckFreq time.Duration = 2500 * time.Millisecond
 
 // UpstreamResumeMsg is the expected indication to resume the application

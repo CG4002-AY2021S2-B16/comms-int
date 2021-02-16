@@ -89,7 +89,7 @@ type Packet struct {
 
 // Connection timeout parameters
 
-// ConnectionEstablishTimeout is the timeout for establishing connection, and then another 1 sec for handshake
+// ConnectionEstablishTimeout is the timeout for establishing connection, and then refreshed by 3 times this duration for handshake
 var ConnectionEstablishTimeout time.Duration = 1 * time.Second
 
 // ConnectionLivenessCheckInterval is the intervals in which it is checked whether a reconnection should be triggered
@@ -112,6 +112,8 @@ const (
 var BLEResetString string = "AT+VERSION=?\r\n" //"AT+RESTART\r\n"
 
 // OutputSize refers to the number of packets accumulated before output is sent over to the ext comms interface
+// low number -> stream-like data
+// high number -> windowed data
 var OutputSize int = 20
 
 // OutputDequeueInterval wakes up the dequeue goroutine to send data over via ext comms interface

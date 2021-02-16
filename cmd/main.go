@@ -66,7 +66,7 @@ func main() {
 				go startApp(as, outBuf.EnqueueBuffer)
 
 			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamPauseMsg {
-				as.MasterCtxCancel()
+				as.HaltAppState()
 				as = appstate.CreateAppState(ctx)
 				as.SetState(commsintconfig.Waiting)
 			}

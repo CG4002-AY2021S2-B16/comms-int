@@ -10,7 +10,7 @@ import (
 // It works on a best effort basis and can allow false positives through (albeit unlikely based on observations)
 // TODO: Can be enhanced once error detection is also implemented
 func (b *Bluno) ReconcilePacket(curr []byte) (commsintconfig.Packet, bool) {
-	// Successful reconciliation if buffer is non-empty, len(prev) + len(curr) == 20, and curr.first is an invalid packetType
+	// Successful reconciliation if buffer is non-empty, len(prev) + len(curr) == 19, and curr.first is an invalid packetType
 	if b.Buffer.Len() > 0 {
 		prev := b.Buffer.Remove(b.Buffer.Back()).([]byte)
 		if (len(prev)+len(curr)) == commsintconfig.ExpectedPacketSize && determinePacketType(append(prev, curr...)) != commsintconfig.Invalid {
