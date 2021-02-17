@@ -25,9 +25,16 @@ void loop(){
   if (new_handshake_req) {
     handshakeResponse();
     resetTimeOffset();
-    handshake_done = true;
-    Serial.flush();
-    delay(500);
+
+    // If for some reason, Beetle is out of sync with laptop
+    // Skip a single handshake, because issue resolves with time
+    if (handshake_done) {
+      Serial.flush();
+      handshake_done = false;
+    } else {
+      handshake_done = true;
+    }
+    delay(300);
   } 
   else if (handshake_done) {
     dataResponse(0, -0, dummy_val, neg_dummy_val, dummy_val + neg_dummy_val, -500);
