@@ -161,12 +161,8 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 				return
 			}
 		case et := <-establishTickChan.C:
-			if commsintconfig.DebugMode {
-				log.Printf("time_check|et=%s", et.String())
-			}
-
 			diff := et.Sub(b.LastPacketReceivedAt)
-			if !b.HandshakeAcknowledged && diff >= 2*commsintconfig.ConnectionEstablishTimeout {
+			if !b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionEstablishTimeout {
 				log.Printf(
 					"client_connection_terminated|establish_ticker_exceed|packets received=%d|lastPacketReceived=%s|curr_t=%s",
 					b.PacketsReceived,
@@ -177,40 +173,6 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 				done <- false
 				return
 			}
-			// } else if !b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionEstablishTimeout {
-			// 	// We attempt a reset of built in BLE chip
-			// 	log.Printf("Attempting reset...")
-
-			// 	// Isolate the characteristic
-			// 	cc, err := b.Client.DiscoverCharacteristics(commandUUID, s[0])
-			// 	if err != nil || len(cc) != 2 { // two because we already discovered dfb1 earlier
-			// 		if commsintconfig.DebugMode {
-			// 			log.Printf("command_char_discovery_err|addr=%s|err=%s|num_characteristics=%d", b.Address, err, len(cc))
-			// 		}
-			// 		return false
-			// 	}
-
-			// 	// Add 2902
-			// 	commandCharacteristic := cc[1]
-			// 	commandCustomDescriptor := ble.NewDescriptor(ble.UUID16(commsintconfig.ClientCharacteristicConfig))
-			// 	commandCustomDescriptor.Handle = commsintconfig.ClientCharacteristicConfigHandle
-			// 	commandCharacteristic.CCCD = customDescriptor
-
-			// 	// Subscribe
-			// 	err = b.Client.Subscribe(commandCharacteristic, false, b.parseResponse)
-			// 	if err != nil {
-			// 		if commsintconfig.DebugMode {
-			// 			log.Printf("command_subscription_err|addr=%s|err=%s", b.Address, err)
-			// 		}
-			// 		return false
-			// 	}
-			// 	defer b.Client.Unsubscribe(commandCharacteristic, false)
-
-			// 	// Write reset BLE AT-Command
-			// 	byteReset := []byte(commsintconfig.BLEResetString)
-			// 	b.Client.WriteCharacteristic(commandCharacteristic, byteReset, false)
-			// 	log.Printf("command_reset_sent|[ % X ]", byteReset)
-			// }
 		case <-pCtx.Done():
 			log.Printf("client_connection_terminated|force=true|packets received=%d", b.PacketsReceived)
 			b.PrintStats()
