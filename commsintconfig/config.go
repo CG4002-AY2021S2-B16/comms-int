@@ -3,6 +3,7 @@ package commsintconfig
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"fmt"
 	"time"
 )
 
@@ -53,7 +54,13 @@ var RespHandshakeSymbol byte = 0xF3
 // RespDataSymbol is the symbol received from a successful data response.
 // We can AND the 17th byte received with this to see if it returns the same value.
 // If so, the packet is indeed a Data packet.
-var RespDataSymbol byte = 0x0C
+// NOTE: A further check for 0x04 should be done to determine if muscle sensor data is available or not.
+var RespDataSymbol byte = 0x08
+
+// NonMuscleSensorSymbol is the symbol associated with an incoming data packet that does not have muscle sensor attached.
+// We can AND the 17th byte received with this to see if it returns the same value.
+// If so, the packet is a Data packet that does not contain a valid muscle sensor value.
+var NonMuscleSensorSymbol byte = 0x04
 
 // ADCmask is the mask used to extract upper 2 bits for the 10-bit muscle sensor ADC reading from an incoming packet
 var ADCmask byte = 0x03
@@ -69,22 +76,43 @@ const (
 	Ack PacketType = 0
 	// Data is a PacketType that refers to a response containing data
 	Data PacketType = 1
+	// DataMS is a PacketType that refers to a response containing data as well as a valid muscle sensor value
+	DataMS PacketType = 2
 	// Invalid is a PacketType that we are not sure about
-	Invalid PacketType = 2
+	Invalid PacketType = 3
 )
 
 // Packet is constructed from a complete bluetooth response
 type Packet struct {
-	Timestamp    int64  `json:"unix_timestamp_milliseconds"`
-	X            int16  `json:"x"`
-	Y            int16  `json:"y"`
-	Z            int16  `json:"z"`
-	Pitch        int16  `json:"pitch"`
-	Roll         int16  `json:"roll"`
-	Yaw          int16  `json:"yaw"`
-	MuscleSensor uint16 `json:"muscle_sensor"`
-	Type         PacketType
-	BlunoNumber  uint8 `json:"bluno"`
+	Timestamp    int64      `json:"unix_timestamp_milliseconds"`
+	X            int16      `json:"x"`
+	Y            int16      `json:"y"`
+	Z            int16      `json:"z"`
+	Pitch        int16      `json:"pitch"`
+	Roll         int16      `json:"roll"`
+	Yaw          int16      `json:"yaw"`
+	Type         PacketType `json:"-"`
+	BlunoNumber  uint8      `json:"bluno"`
+	MuscleSensor *uint16    `json:"muscle_sensor,omitempty"`
+}
+
+func (p Packet) String() string {
+	s := fmt.Sprintf("Timestamp: %d X:%d Y:%d Z:%d Pitch:%d Roll:%d Yaw:%d Type:%d BlunoNumber:%d",
+		p.Timestamp,
+		p.X,
+		p.Y,
+		p.Z,
+		p.Pitch,
+		p.Roll,
+		p.Yaw,
+		p.Type,
+		p.BlunoNumber,
+	)
+
+	if p.MuscleSensor != nil {
+		return s + fmt.Sprintf(" MuscleSensor: %d", *p.MuscleSensor)
+	}
+	return s
 }
 
 // Connection timeout parameters

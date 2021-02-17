@@ -7,6 +7,8 @@
 
 // Packet masks
 #define DESIGNATE_DATA_PACKET_MASK 0x0C // 0b0000 1100, To be ORed with
+#define DESIGNATE_DATA_PACKET_WITH_MUSCLE_SENSOR_MASK 0x08 // 0b0000 1000, To be ORed with
+
 #define DESIGNATE_ACK_PACKET_MASK 0xF3  // 0b1111 0011, To be ANDed with
 
 // Handshake constants
@@ -29,7 +31,7 @@ const byte AESKeyStageTwo[AES_BLOCK_SIZE] = {0x7A, 0x24, 0x43, 0x26, 0x46, 0x29,
 uint8_t receivedChar;
 boolean new_handshake_req = false;
 boolean handshake_done = false;
-boolean muscle_sensor_active = false;
+boolean muscle_sensor_active = true;
 
 // Time
 uint32_t start_time = millis();
@@ -146,7 +148,11 @@ uint8_t* addMuscleSensorDataToBuffer(uint8_t* next, uint16_t ms_val) {
 
 // setDataPacketTypeToBuffer adds 2-bit packet type data to the buffer to designate as data packet
 uint8_t* setDataPacketTypeToBuffer(uint8_t* next) {
-  next[0] |= DESIGNATE_DATA_PACKET_MASK;
+  if (muscle_sensor_active) {
+    next[0] |= DESIGNATE_DATA_PACKET_WITH_MUSCLE_SENSOR_MASK;
+  } else {
+    next[0] |= DESIGNATE_DATA_PACKET_MASK;
+  }
   return next + 1;
 }
 
@@ -200,7 +206,7 @@ void dataResponse(int16_t x, int16_t y, int16_t z, int16_t pitch, int16_t roll, 
   buf = addLongToBuffer(buf, calculateTimestamp());
   buf = addIMUDataToBuffer(buf, x, y, z, pitch, roll, yaw);
 
-  uint8_t* partial = (muscle_sensor_active)? addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL - 1) : addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
+  uint8_t* partial = (muscle_sensor_active)? addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL) : addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
   buf = setDataPacketTypeToBuffer(partial);
 
   // Perform encryption

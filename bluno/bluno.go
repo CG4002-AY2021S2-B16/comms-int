@@ -211,7 +211,7 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 		}
 
 		if commsintconfig.DebugMode {
-			log.Printf("Packet processed %+v for resp [ % X ]\n", p, resp)
+			log.Printf("Packet processed %v for resp [ % X ]\n", p, resp)
 		}
 
 		switch p.Type {
@@ -237,7 +237,10 @@ func determinePacketType(d []byte) commsintconfig.PacketType {
 	if d[17]|commsintconfig.RespHandshakeSymbol == commsintconfig.RespHandshakeSymbol {
 		return commsintconfig.Ack
 	} else if d[17]&commsintconfig.RespDataSymbol == commsintconfig.RespDataSymbol {
-		return commsintconfig.Data
+		if d[17]&commsintconfig.NonMuscleSensorSymbol == commsintconfig.NonMuscleSensorSymbol {
+			return commsintconfig.Data
+		}
+		return commsintconfig.DataMS
 	}
 	return commsintconfig.Invalid
 }
@@ -286,10 +289,11 @@ func formTimestamp(b *Bluno, resp []byte, start uint8) time.Time {
 
 // getMuscleSensorReading takes in a bluno, a packet and extracts the muscle sensor reading
 // from the lower 8 bits and the 1st and 2nd bit from the 18th byte
-func getMuscleSensorReading(b *Bluno, resp []byte, lower uint8, upper uint8) uint16 {
+func getMuscleSensorReading(b *Bluno, resp []byte, lower uint8, upper uint8) *uint16 {
 	l := resp[lower]
 	h := resp[upper] & commsintconfig.ADCmask
-	return binary.LittleEndian.Uint16([]byte{l, h})
+	p := binary.LittleEndian.Uint16([]byte{l, h})
+	return &p
 }
 
 func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
@@ -304,7 +308,7 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 		b.HandshakedAt = time.Now()
 	}
 
-	return commsintconfig.Packet{
+	pkt := commsintconfig.Packet{
 		Timestamp:    formTimestamp(b, resp, 0).UnixNano() / int64(time.Millisecond),
 		X:            twoByteToNum(resp, 4),
 		Y:            twoByteToNum(resp, 6),
@@ -312,10 +316,15 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 		Pitch:        twoByteToNum(resp, 10),
 		Roll:         twoByteToNum(resp, 12),
 		Yaw:          twoByteToNum(resp, 14),
-		MuscleSensor: getMuscleSensorReading(b, resp, 16, 17),
+		MuscleSensor: nil,
 		Type:         t,
 		BlunoNumber:  b.Num,
 	}
+
+	if t == commsintconfig.DataMS {
+		pkt.MuscleSensor = getMuscleSensorReading(b, resp, 16, 17)
+	}
+	return pkt
 }
 
 // PrintStats prints out transmission statistics for a given bluno
