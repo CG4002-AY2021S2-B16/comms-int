@@ -53,9 +53,7 @@ func (b *Bluno) Connect(pCtx context.Context, m chan bool, done chan bool) {
 	}
 
 	if err != nil {
-		if commsintconfig.DebugMode {
-			log.Printf("client_connection_fail|addr=%s|err=%s", b.Address, err)
-		}
+		log.Printf("client_connection_fail|addr=%s|err=%s", b.Address, err)
 		time.Sleep(2 * time.Second) // Sleep fixed duration to induce predictability and allow other connection attempts
 		done <- false
 		return
@@ -63,9 +61,8 @@ func (b *Bluno) Connect(pCtx context.Context, m chan bool, done chan bool) {
 
 	b.SetClient(&client)
 	b.StateUpdateChan <- commsintconfig.NotHandshaked
-	if commsintconfig.DebugMode {
-		log.Printf("client_connection_succeeded|addr=%s", b.Address)
-	}
+	log.Printf("client_connection_succeeded|addr=%s", b.Address)
+
 	done <- true
 }
 
@@ -111,9 +108,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 	// Subscribe to notifications
 	err = b.Client.Subscribe(characteristic, false, b.parseResponse(hsFail, wr))
 	if err != nil {
-		if commsintconfig.DebugMode {
-			log.Printf("client_subscription_err|addr=%s|err=%s", b.Address, err)
-		}
+		log.Printf("client_subscription_err|addr=%s|err=%s", b.Address, err)
 		done <- false
 		return
 	}
@@ -211,7 +206,7 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 		}
 
 		if commsintconfig.DebugMode {
-			log.Printf("Packet processed %v for resp [ % X ]\n", p, resp)
+			printPacket(&p, resp)
 		}
 
 		switch p.Type {
