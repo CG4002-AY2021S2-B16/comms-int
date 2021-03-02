@@ -139,8 +139,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 			return
 		case <-hsFail:
 			log.Printf("client_handshake_fail|addr=%s", b.Address)
-			done <- false
-			return
+			b.Client.CancelConnection()
 		case t := <-tickChan.C:
 			diff := t.Sub(b.LastPacketReceivedAt)
 			if b.HandshakeAcknowledged && diff >= commsintconfig.ConnectionLivenessTimeout {
@@ -152,8 +151,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 					t,
 				)
 				b.StateUpdateChan <- commsintconfig.NotConnected
-				done <- false
-				return
+				b.Client.CancelConnection()
 			}
 		case et := <-establishTickChan.C:
 			diff := et.Sub(b.LastPacketReceivedAt)
@@ -165,14 +163,14 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 					et,
 				)
 				b.StateUpdateChan <- commsintconfig.NotConnected
-				done <- false
-				return
+				b.Client.CancelConnection()
 			}
 		case <-pCtx.Done():
 			log.Printf("client_connection_terminated|force=true|packets received=%d", b.PacketsReceived)
 			b.PrintStats()
 			b.StateUpdateChan <- commsintconfig.NotConnected
 			b.Client.ClearSubscriptions()
+			b.Client.CancelConnection()
 			done <- true
 			return
 		}
