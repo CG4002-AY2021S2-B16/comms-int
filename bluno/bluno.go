@@ -214,6 +214,12 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 			b.HandshakeAcknowledged = true
 		case commsintconfig.Invalid:
 			b.PacketsInvalidType++
+		case commsintconfig.Liveness:
+			if b.HandshakeAcknowledged == false {
+				hsFail <- true
+			} else {
+				b.PacketsImmSuccess++
+			}
 		default:
 			if b.HandshakeAcknowledged == false {
 				hsFail <- true
@@ -227,13 +233,15 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 
 // determinePacketType returns the packet's type based on the 3rd and 4th bit of the 18th byte of the response
 func determinePacketType(d []byte) commsintconfig.PacketType {
-	if d[17]|commsintconfig.RespHandshakeSymbol == commsintconfig.RespHandshakeSymbol {
+	if d[17]|commsintconfig.RespHandshakeSymbol == commsintconfig.RespHandshakeSymbol { // 00
 		return commsintconfig.Ack
-	} else if d[17]&commsintconfig.RespDataSymbol == commsintconfig.RespDataSymbol {
-		if d[17]&commsintconfig.NonMuscleSensorSymbol == commsintconfig.NonMuscleSensorSymbol {
+	} else if d[17]&commsintconfig.RespDataSymbol == commsintconfig.RespDataSymbol { // 1X
+		if d[17]&commsintconfig.NonMuscleSensorSymbol == commsintconfig.NonMuscleSensorSymbol { // 11
 			return commsintconfig.Data
 		}
-		return commsintconfig.DataMS
+		return commsintconfig.DataMS // 10
+	} else if d[17]&commsintconfig.RespLivenessSymbol == commsintconfig.RespLivenessSymbol { // 01
+		return commsintconfig.Liveness
 	}
 	return commsintconfig.Invalid
 }

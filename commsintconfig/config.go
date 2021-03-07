@@ -54,6 +54,11 @@ var InitHandshakeSymbol byte = 'A'
 // If so, the packet is indeed an ACK packet.
 var RespHandshakeSymbol byte = 0xF3
 
+// RespLivenessSymbol is the symbol received from a successful liveness packet.
+// We can AND the 17th byte received to see if it returns the same value.
+// If so, the packet is indeed a Liveness packet.
+var RespLivenessSymbol byte = 0x04
+
 // RespDataSymbol is the symbol received from a successful data response.
 // We can AND the 17th byte received with this to see if it returns the same value.
 // If so, the packet is indeed a Data packet.
@@ -81,8 +86,10 @@ const (
 	Data PacketType = 1
 	// DataMS is a PacketType that refers to a response containing data as well as a valid muscle sensor value
 	DataMS PacketType = 2
+	// Liveness is a PacketType that refers to a liveness check packet
+	Liveness PacketType = 3
 	// Invalid is a PacketType that we are not sure about
-	Invalid PacketType = 3
+	Invalid PacketType = 4
 )
 
 // Packet is constructed from a complete bluetooth response

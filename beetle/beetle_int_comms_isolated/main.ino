@@ -37,7 +37,12 @@ void loop(){
     delay(300);
   } 
   else if (handshake_done) {
-    dataResponse(0, -0, dummy_val, neg_dummy_val, dummy_val + neg_dummy_val, -500);
+    if (checkLivenessPacketRequired()) {
+      livenessResponse();
+    } else {
+      // if data available
+      dataResponse(0, -0, dummy_val, neg_dummy_val, dummy_val + neg_dummy_val, -500);
+    }
     dummy_val--;
     neg_dummy_val++;
   }
