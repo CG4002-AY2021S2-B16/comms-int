@@ -1,0 +1,2 @@
+sshtunnel==0.4.0
+pycryptodome==3.10.1

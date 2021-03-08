@@ -12,11 +12,14 @@ services:
       - ./sockets:/tmp/www/comms/
     command: "go run main.go"
     tty: true
-  python_controller:
+  laptop_client:
     build:
       context: ./supporting_scripts
+      dockerfile: Dockerfile
     network_mode: host
     privileged: true
     volumes: 
       - ./supporting_scripts:/var/www/comms-int
       - ./sockets:/tmp/www/comms/
+    # command: "python laptop_client.py"
+    command: "python mock_client.py"
