@@ -26,11 +26,7 @@ def control_ble():
         user_input = int(input())
         if user_input == 0:
             data = json.dumps({ "cmd": RESUME_CMD })
-        else:
-            data = json.dumps({ "cmd": PAUSE_CMD })
-        
-        print("Data = ", data)
-        client.send(data.encode('utf-8'))
+            client.send(data.encode('utf-8'))
     client.close()
 
 
@@ -59,11 +55,14 @@ def read_ble_data():
 
             try:
                 parsed = json.loads(d)
-                for item in parsed:
-                    if first_row:
-                        sensor_writer.writerow(item.keys())
-                        first_row = False
-                    sensor_writer.writerow(item.values())
+                if parsed.get('timestamps') is not None:
+                    print(parsed)
+                elif parsed.get('packets') is not None:
+                    for item in parsed.get('packets'):
+                        if first_row:
+                            sensor_writer.writerow(item.keys())
+                            first_row = False
+                        sensor_writer.writerow(item.values())
             except json.JSONDecodeError:
                 pass
 

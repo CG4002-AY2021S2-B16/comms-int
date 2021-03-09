@@ -65,10 +65,9 @@ func main() {
 				// Start application
 				go startApp(as, outBuf.EnqueueBuffer)
 
-			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamPauseMsg {
-				as.HaltAppState()
-				as = appstate.CreateAppState(ctx)
-				as.SetState(commsintconfig.Waiting)
+			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamResumeMsg {
+				// Send time sync packets
+				us.WriteTimestamp()
 			}
 		}
 		log.Printf("Application is now in state %d", as.GetState())
