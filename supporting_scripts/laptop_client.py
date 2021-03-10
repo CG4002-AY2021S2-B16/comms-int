@@ -20,12 +20,14 @@ SUNFIRE_USERNAME = "tamelly"
 SUNFIRE_PASSWORD = "cg4002b16"
 
 class Client():
-    def __init__(self, ip_addr, secret_key):
+    def __init__(self, ip_addr, secret_key, bluno_num):
         super(Client, self).__init__()
         self.ip_addr = ip_addr
         self.secret_key = secret_key
+        self.bluno_num = bluno_num
 
-        self.startBlunos = threading.Event()
+        self.start_bluno = threading.Event()
+        self.bluno_connected = threading.Event()
 
         #Thread for laptop to pause/recv data from bluno
         self.ultra96toBlunoThread = threading.Thread(target=self.ultra96toBluno)
@@ -51,12 +53,14 @@ class Client():
         return decrypted_message
 
     def send_ultra96(self, message):
-        encrypted_message = self.encrypt_message(message)
+        #encrypted_message = self.encrypt_message(message)
+        encrypted_message = (message + "@").encode('utf8')
+
         try:
-            self.ultra96socket.sendall(encrypted_message)
-            print(F"[LAPTOP -> ULTRA96] SENT: {message}")
-        except Exception:
-            print(F"[LAPTOP -> ULTRA96] FAILED TO SEND: {message}")
+            self.ultra96socket.send(encrypted_message)
+            print(F"[LAPTOP -> ULTRA96] SENT: {encrypted_message}")
+        except Exception as e:
+            print(F"[LAPTOP -> ULTRA96] FAILED TO SEND: {encrypted_message} {e}")
     
     # Handle commands from Ultra96. For now, only timestamp will be sent
     def ultra96toBluno(self):
@@ -67,28 +71,21 @@ class Client():
 
         while True:
             try: 
-                data = self.ultra96socket.recv(1024)
+                data = self.ultra96socket.recv(4096)
                 if data:
                     decrypted_message = self.decrypt_message(data)
                     print(F"[ULTRA96 -> LAPTOP] RECEIVED {decrypted_message}")
-                    if "!T" in decrypted_message:
-                        #send timestamp to bluno
-                        self.send_blunos(data)
+                    self.send_blunos(decrypted_message)
             except socket.timeout:
                 pass
     
     def send_blunos(self, message):
         #Send 1 to pause, 0 to resume, others for timestamp
-        if message == 0:
+        print(message)
+        if message == "#T 0":
             data = json.dumps({ "cmd": RESUME_CMD })
             print("[LAPTOP -> BLUNO] RESUME receiving data from blunos")
-        elif message == 1:
-            data = json.dumps({ "cmd": PAUSE_CMD })
-            print("[LAPTOP -> BLUNO] PAUSE receiving data from blunos")
-        else:
-            #clock synchro packet to send to bluno
-            data = json.dumps({ message })
-        self.blunosClient.send(data.encode('utf8'))
+            self.blunosClient.send(data.encode('utf8'))
     
     # Handle data from bluno
     def blunoToUltra96(self):
@@ -98,40 +95,43 @@ class Client():
         self.blunosServer.connect(DATA_SOCK_PATH)
 
         while True:
-            data = self.blunosServer.recv(1024).decode('utf8')
-            if data:
-                parsed_data = json.loads(data)
-                decrypted_message = self.decrypt_message(parsed_data)
-                print(F"[BLUNO -> LAPTOP] Received {decrypted_message} from Blunos")
-                # Send data to Ultra96
-                self.send_ultra96(decrypted_message)
+            try:
+                data = self.blunosServer.recv(1024).decode('utf8')
+                if data:
+                    parsed_data = json.loads(data)
+                    print(F"[BLUNO -> LAPTOP] Received {parsed_data} from Blunos")
+                    # Send data to Ultra96
+                    if "t_one" in parsed_data:
+                        # Update with bluno number
+                        bluno = {"bluno" : self.bluno_num}
+                        decrypted_message.update(bluno)
+                    self.send_ultra96(json.dumps(parsed_data))
+            except ConnectionResetError:
+                self.bluno_connected.clear()
+                print("Connection to Ultra96 reset, trying to reconnect...")
+                break
 
     def run(self):
         #Open tunnel to ultra96
-        with sshtunnel.open_tunnel(
+        tunnel1 = sshtunnel.open_tunnel(
             ssh_address_or_host=('sunfire.comp.nus.edu.sg', 22),
             remote_bind_address=('137.132.86.239', 22),
             ssh_username=SUNFIRE_USERNAME,
             ssh_password=SUNFIRE_PASSWORD,
-        ) as tunnel1:
-            print('Connection to tunnel1 (sunfire.comp.nus.edu.sg:22) OK...')
-            with sshtunnel.open_tunnel(
+        )
+        tunnel1.start()
+        print('Connection to tunnel1 (sunfire.comp.nus.edu.sg:22) OK...')
+        tunnel2 = sshtunnel.open_tunnel(
                 ssh_address_or_host=('localhost', tunnel1.local_bind_port),
-                remote_bind_address=('127.0.0.1', 22),
+                remote_bind_address=('127.0.0.1', 8081),
                 ssh_username='xilinx',
                 ssh_password='xilinx',
-            ) as tunnel2:
-                print('Connection to tunnel2 (137.132.86.239:22) OK...')
-                tunnel2.start()
+                local_bind_address=('127.0.0.1', 8081),
+            )
+        print('Connection to tunnel2 (137.132.86.239:8083) OK...')
+        tunnel2.start()
 
-        #Start sending inputs to bluno thru relay laptop from Ultra96
-        self.ultra96toBlunoThread.setDaemon(True)
-        self.ultra96toBlunoThread.start()
-        #Start receiving data from bluno then pass to ultra96
-        self.blunoToUltra96Thread.setDaemon(True)
-        self.blunoToUltra96Thread.start()
-
-        # Connect to ultra96
+        # Connect to ultra96, set flag to ensure its still connected
         while True:
             try:
                 #Start connection to ultra96 (may need to set flag if ultra96 not ready)
@@ -139,13 +139,28 @@ class Client():
                 self.ultra96socket.settimeout(1)
                 self.ultra96socket.connect(self.ip_addr)
                 print("[SOCKET CREATED] LAPTOP CONNECTED TO ULTRA96")
+                self.bluno_connected.set()
+
+                # Start sending inputs to bluno thru relay laptop from Ultra96
+                self.ultra96toBlunoThread.setDaemon(True)
+                self.ultra96toBlunoThread.start()
+                # Start receiving data from bluno then pass to ultra96
+                self.blunoToUltra96Thread.setDaemon(True)
+                self.blunoToUltra96Thread.start()
+
+                # Hold connection to bluno
+                while self.bluno_connected.is_set():
+                    time.sleep(1)
                 time.sleep(1)
             except ConnectionRefusedError:
-                print("Can't connect")
+                self.bluno_connected.clear()
+                print("[CONNECTION REFUSED] Laptop unable to connect to Ultra96")
+                time.sleep(1)
             except Exception:
-                pass
-
+                print("Laptop unable to connect to Ultra96")
+            if KeyboardInterrupt:
+                self.ultra96socket.close()
 
 if __name__ == '__main__':
-    client = Client(('localhost', 1235), '0000000000000000')
-    client.run()                                                                
+    client = Client(('localhost', 8081), '0000000000000000', 1)
+    client.run()                                                     

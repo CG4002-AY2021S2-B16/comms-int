@@ -152,10 +152,10 @@ var BLEResetString string = "AT+VERSION=?\r\n" //"AT+RESTART\r\n"
 // OutputSize refers to the number of packets accumulated before output is sent over to the ext comms interface
 // low number -> stream-like data
 // high number -> windowed data
-var OutputSize int = 20
+var OutputSize int = 4
 
 // OutputDequeueInterval wakes up the dequeue goroutine to send data over via ext comms interface
-var OutputDequeueInterval time.Duration = 100 * time.Millisecond
+var OutputDequeueInterval time.Duration = 5 * time.Millisecond
 
 // BlunoStatus indicates the current status of blunos being managed by the int comm server
 type BlunoStatus uint8
