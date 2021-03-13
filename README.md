@@ -1,6 +1,6 @@
 # comms int
 
-Golang application to be run on relay laptops that are in physical proximity of BLE-compatible devices
+Containerized Golang application to be run on relay laptops that are in physical proximity of BLE-compatible devices
 
 - Up to 120 twenty-byte packets per second, per connected peripheral, over Bluetooth Low Energy v4.0
 - Reliable protocol w/ automatic reconnection
