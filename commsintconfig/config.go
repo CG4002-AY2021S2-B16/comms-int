@@ -84,8 +84,8 @@ const (
 	Ack PacketType = 0
 	// Data is a PacketType that refers to a response containing data
 	Data PacketType = 1
-	// DataMS is a PacketType that refers to a response containing data as well as a valid muscle sensor value
-	DataMS PacketType = 2
+	// DataEMG is a PacketType that refers to a response containing EMG data
+	DataEMG PacketType = 2
 	// Liveness is a PacketType that refers to a liveness check packet
 	Liveness PacketType = 3
 	// Invalid is a PacketType that we are not sure about
@@ -103,7 +103,7 @@ type Packet struct {
 	Yaw          int16      `json:"yaw"`
 	Type         PacketType `json:"-"`
 	BlunoNumber  uint8      `json:"bluno"`
-	MuscleSensor *uint16    `json:"muscle_sensor,omitempty"`
+	MuscleSensor *uint16    `json:"muscle_sensor,omitempty"` // If this key is present, ignore the 6 IMU values - they are dummy readings.
 }
 
 func (p Packet) String() string {

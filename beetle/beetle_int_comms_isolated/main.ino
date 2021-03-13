@@ -1,6 +1,11 @@
+#define EMG_SENSOR_MODE false
+
 // Dynamically changing dummy data value
 int16_t dummy_val = 32767;
 int16_t neg_dummy_val = -32768;
+
+float dummy_f_val = 314.26;
+float neg_dummy_f_val = -527.984231;
 
 
 void setup() {
@@ -39,12 +44,17 @@ void loop(){
   else if (handshake_done) {
     if (checkLivenessPacketRequired()) {
       livenessResponse();
+      delay(7);
+    } else if (EMG_SENSOR_MODE) {
+      EMGdataResponse(0.00, dummy_f_val, neg_dummy_f_val);
+      delay(128); // There should not be a delay on integrated code, because delay comes exclusively from EMG sampling
     } else {
-      // if data available
-      dataResponse(0, -0, dummy_val, neg_dummy_val, dummy_val + neg_dummy_val, -500);
+      IMUdataResponse(0, -0, dummy_val, neg_dummy_val, dummy_val + neg_dummy_val, -500);
+      delay(7);
     }
     dummy_val--;
     neg_dummy_val++;
+    dummy_f_val--;
+    neg_dummy_f_val++;
   }
-  delay(7);
 }

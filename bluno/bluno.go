@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/CG4002-AY2021S2-B16/comms-int/commsintconfig"
@@ -239,7 +240,7 @@ func determinePacketType(d []byte) commsintconfig.PacketType {
 		if d[17]&commsintconfig.NonMuscleSensorSymbol == commsintconfig.NonMuscleSensorSymbol { // 11
 			return commsintconfig.Data
 		}
-		return commsintconfig.DataMS // 10
+		return commsintconfig.DataEMG // 10
 	} else if d[17]&commsintconfig.RespLivenessSymbol == commsintconfig.RespLivenessSymbol { // 01
 		return commsintconfig.Liveness
 	}
@@ -250,6 +251,13 @@ func determinePacketType(d []byte) commsintconfig.PacketType {
 // it assumes the bytes are arranged in little endian format
 func twoByteToNum(d []byte, start uint8) int16 {
 	return int16(binary.LittleEndian.Uint16(d[start : start+2]))
+}
+
+// fourByteToFloat converts 4 consecutive bytes into a float64
+// it assumes the bytes are arranged in little endian format
+func fourByteToFloat(d []byte, start uint8) float32 {
+	asIntbits := binary.LittleEndian.Uint32(d[start : start+4])
+	return math.Float32frombits(asIntbits)
 }
 
 // calculateChecksum takes a complete packet and finds its checksum
@@ -297,6 +305,19 @@ func getMuscleSensorReading(b *Bluno, resp []byte, lower uint8, upper uint8) *ui
 	return &p
 }
 
+// getEMGSensorData takes in a packet and extracts the emg sensor data to provide a single fatigue level value
+// https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6679263/
+// MAV = mean absolute value
+// RMS = root mean square
+// MNF = mean frequency
+func getEMGSensorData(b *Bluno, resp []byte) {
+	MAV := fourByteToFloat(resp, 4)
+	RMS := fourByteToFloat(resp, 8)
+	MNF := fourByteToFloat(resp, 12)
+
+	log.Println(MAV, RMS, MNF)
+}
+
 func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 	if !calculateChecksum(resp) {
 		return commsintconfig.Packet{Type: commsintconfig.Invalid}
@@ -322,8 +343,9 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 		BlunoNumber:  b.Num,
 	}
 
-	if t == commsintconfig.DataMS {
-		pkt.MuscleSensor = getMuscleSensorReading(b, resp, 16, 17)
+	if t == commsintconfig.DataEMG {
+		getEMGSensorData(b, resp)
+		pkt.MuscleSensor = getMuscleSensorReading(b, resp, 16, 17) // DEPRECATED
 	}
 	return pkt
 }

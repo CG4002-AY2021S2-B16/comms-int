@@ -3,11 +3,11 @@
 
 // Packet Specification
 #define PACKET_SIZE 19
-#define MUSCLE_SENSOR_INVALID_VAL 1023
+#define MUSCLE_SENSOR_INVALID_VAL 1023 // TO BE DEPRECATED
 
 // Packet masks
-#define DESIGNATE_DATA_PACKET_MASK 0x0C // 0b0000 1100, To be ORed with
-#define DESIGNATE_DATA_PACKET_WITH_MUSCLE_SENSOR_MASK 0x08 // 0b0000 1000, To be ORed with
+#define DESIGNATE_IMU_PACKET_MASK 0x0C // 0b0000 1100, To be ORed with
+#define DESIGNATE_EMG_PACKET_MASK 0x08 // 0b0000 1000, To be ORed with
 
 #define DESIGNATE_ACK_PACKET_MASK 0xF3  // 0b1111 0011, To be ANDed with
 #define DESIGNATE_LIVENESS_PACKET_MASK 0x04 // To be ORed with
@@ -35,7 +35,6 @@ const byte AESKeyStageTwo[AES_BLOCK_SIZE] = {0x7A, 0x24, 0x43, 0x26, 0x46, 0x29,
 uint8_t receivedChar;
 boolean new_handshake_req = false;
 boolean handshake_done = false;
-boolean muscle_sensor_active = false;
 
 // Time
 uint32_t start_time = millis();
@@ -151,6 +150,29 @@ uint8_t* addIMUDataToBuffer(uint8_t* next, uint16_t x, uint16_t y, uint16_t z, u
 }
 
 
+// addFloatToBuffer writes a IEEE 754 32-bit float as 4 bytes to the buffer
+// It uses little endian e.g. 0x0A1B2C3D -> 3D 2C 1B 0A
+// returns next location after filling in 4 bytes
+uint8_t* addFloatToBuffer(uint8_t* start, float x) {
+  uint32_t asInt = *((uint32_t*)&x);
+
+  for (int i = 0; i < 4; i++) {
+    start[i] = (asInt >> (i * 8)) & 0xFF;
+  }
+  return start + 4;
+}
+
+
+// Adds 32-bit EMG data to the buffer
+uint8_t* addEMGDataToBuffer(uint8_t* next, float MAV, float RMS, float MNF) {
+  next = addFloatToBuffer(next, MAV);
+  next = addFloatToBuffer(next, RMS);
+  next = addFloatToBuffer(next, MNF);
+  return next;
+}
+
+
+// TO BE DEPRECATED
 //addMuscleSensorDataToBuffer adds 10-bit Muscle Sensor data to the buffer
 uint8_t* addMuscleSensorDataToBuffer(uint8_t* next, uint16_t ms_val) {  
   next[0] = ms_val & 0xFF;
@@ -159,18 +181,21 @@ uint8_t* addMuscleSensorDataToBuffer(uint8_t* next, uint16_t ms_val) {
 }
 
 
-// setDataPacketTypeToBuffer adds 2-bit packet type data to the buffer to designate as data packet
-uint8_t* setDataPacketTypeToBuffer(uint8_t* next) {
-  if (muscle_sensor_active) {
-    next[0] |= DESIGNATE_DATA_PACKET_WITH_MUSCLE_SENSOR_MASK;
-  } else {
-    next[0] |= DESIGNATE_DATA_PACKET_MASK;
-  }
+// setIMUPacketTypeToBuffer adds 2-bit packet type data to the buffer to designate as IMU data packet
+uint8_t* setIMUPacketTypeToBuffer(uint8_t* next) {
+  next[0] |= DESIGNATE_IMU_PACKET_MASK;
   return next + 1;
 }
 
 
-// setAckPacketTypeToBuffer adds 2-bit packet type data to the buffer to designate as data packet
+// setEMGPacketTypeToBuffer adds 2-bit packet type data to the buffer to designate as EMG data packet
+uint8_t* setEMGPacketTypeToBuffer(uint8_t* next) {
+  next[0] |= DESIGNATE_EMG_PACKET_MASK;
+  return next + 1;
+}
+
+
+// setAckPacketTypeToBuffer adds 2-bit packet type data to the buffer to designate as ack packet
 uint8_t* setAckPacketTypeToBuffer(uint8_t* next) {
   next[0] &= DESIGNATE_ACK_PACKET_MASK;
   return next + 1;
@@ -240,21 +265,22 @@ void livenessResponse() {
 }
 
 
-// dataResponse prepares the data to be sent out
-// Rotation about X axis = pitch
-// Rotation about Y axis = roll
-// Rotation about Z axis = yaw
-void dataResponse(int16_t x, int16_t y, int16_t z, int16_t pitch, int16_t roll, int16_t yaw) {
+// EMGdataResponse prepares the data to be sent out
+// https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6679263/
+// MAV = mean absolute value
+// RMS = root mean square
+// MNF = mean frequency
+void EMGdataResponse(float MAV, float RMS, float MNF) {
   // Pre-process
   clearSendBuffer();
   uint8_t* buf = sendBuffer;
-  
+
   // Fill different sections of the buffer
   buf = addLongToBuffer(buf, calculateTimestamp());
-  buf = addIMUDataToBuffer(buf, x, y, z, pitch, roll, yaw);
+  buf = addEMGDataToBuffer(buf, MAV, RMS, MNF);
 
-  uint8_t* partial = (muscle_sensor_active)? addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL) : addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL);
-  buf = setDataPacketTypeToBuffer(partial);
+  uint8_t* partial = addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL); // TO BE DEPRECATED
+  buf = setEMGPacketTypeToBuffer(partial);
 
   // Perform encryption
   encryptAES(sendBuffer);
@@ -267,6 +293,33 @@ void dataResponse(int16_t x, int16_t y, int16_t z, int16_t pitch, int16_t roll, 
   updateLastPacketSent();
 }
 
+
+// IMUdataResponse prepares the data to be sent out
+// Rotation about X axis = pitch
+// Rotation about Y axis = roll
+// Rotation about Z axis = yaw
+void IMUdataResponse(int16_t x, int16_t y, int16_t z, int16_t pitch, int16_t roll, int16_t yaw) {
+  // Pre-process
+  clearSendBuffer();
+  uint8_t* buf = sendBuffer;
+  
+  // Fill different sections of the buffer
+  buf = addLongToBuffer(buf, calculateTimestamp());
+  buf = addIMUDataToBuffer(buf, x, y, z, pitch, roll, yaw);
+
+  uint8_t* partial = addMuscleSensorDataToBuffer(buf, MUSCLE_SENSOR_INVALID_VAL); // TO BE DEPRECATED
+  buf = setIMUPacketTypeToBuffer(partial);
+
+  // Perform encryption
+  encryptAES(sendBuffer);
+
+  // Calculate and fill in checksum
+  setChecksum();
+
+  // Send response out
+  Serial.write(sendBuffer, PACKET_SIZE);
+  updateLastPacketSent();
+}
 
 
 void receiveData() {
