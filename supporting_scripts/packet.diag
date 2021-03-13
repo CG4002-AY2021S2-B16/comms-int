@@ -1,0 +1,16 @@
+{
+  colwidth = 32
+  node_height = 48
+
+  0-31: Timestamp
+  32-47: IMU_X
+  48-63: IMU_Y
+  64-79: IMU_Z
+  80-95: IMU_Yaw
+  96-111: IMU_Pitch
+  112-127: IMU_Roll
+  128-129: Type [rotate = 270]
+  130-135: Reserved
+  136-143: Checksum
+  144-159: Unused
+}
