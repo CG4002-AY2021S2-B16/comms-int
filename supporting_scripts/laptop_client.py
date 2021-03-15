@@ -25,6 +25,7 @@ class Client():
         self.ip_addr = ip_addr
         self.secret_key = secret_key
         self.bluno_num = bluno_num
+        self.sent_count = 0
 
         self.start_bluno = threading.Event()
         self.bluno_connected = threading.Event()
@@ -53,14 +54,15 @@ class Client():
         return decrypted_message
 
     def send_ultra96(self, message):
-        #encrypted_message = self.encrypt_message(message)
+        # encrypted_message = self.encrypt_message(message)
         encrypted_message = (message + "@").encode('utf8')
 
         try:
-            self.ultra96socket.send(encrypted_message)
-            print(F"[LAPTOP -> ULTRA96] SENT: {encrypted_message}")
+            self.ultra96socket.sendall(encrypted_message)
+            print(F"[LAPTOP -> ULTRA96] SENT: {self.sent_count}")
+            self.sent_count += 4
         except Exception as e:
-            print(F"[LAPTOP -> ULTRA96] FAILED TO SEND: {encrypted_message} {e}")
+            print(F"[LAPTOP -> ULTRA96] FAILED TO SEND: {self.sent_count}, ERROR: {e}")
     
     # Handle commands from Ultra96. For now, only timestamp will be sent
     def ultra96toBluno(self):
@@ -81,7 +83,6 @@ class Client():
     
     def send_blunos(self, message):
         #Send 1 to pause, 0 to resume, others for timestamp
-        print(message)
         if message == "#T 0":
             data = json.dumps({ "cmd": RESUME_CMD })
             print("[LAPTOP -> BLUNO] RESUME receiving data from blunos")
@@ -99,12 +100,9 @@ class Client():
                 data = self.blunosServer.recv(1024).decode('utf8')
                 if data:
                     parsed_data = json.loads(data)
+                    # decrypted_message = self.decrypt_message(parsed_data)
                     print(F"[BLUNO -> LAPTOP] Received {parsed_data} from Blunos")
                     # Send data to Ultra96
-                    if "t_one" in parsed_data:
-                        # Update with bluno number
-                        bluno = {"bluno" : self.bluno_num}
-                        decrypted_message.update(bluno)
                     self.send_ultra96(json.dumps(parsed_data))
             except ConnectionResetError:
                 self.bluno_connected.clear()
@@ -112,7 +110,7 @@ class Client():
                 break
 
     def run(self):
-        #Open tunnel to ultra96
+        # Open tunnel to ultra96
         tunnel1 = sshtunnel.open_tunnel(
             ssh_address_or_host=('sunfire.comp.nus.edu.sg', 22),
             remote_bind_address=('137.132.86.239', 22),
