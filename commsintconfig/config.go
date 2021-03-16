@@ -103,7 +103,7 @@ type Packet struct {
 	Yaw          int16      `json:"yaw"`
 	Type         PacketType `json:"-"`
 	BlunoNumber  uint8      `json:"bluno"`
-	MuscleSensor bool       `json:"muscle_sensor,omitempty"` // If this key is present, ignore the 6 IMU values - they are dummy readings.
+	MuscleSensor bool       `json:"muscle_sensor"` // If this key is present, ignore the 6 IMU values - they are dummy readings.
 	MAV          float32    `json:"mean_absolute_value,omitempty"`
 	RMS          float32    `json:"root_mean_square,omitempty"`
 	MNF          float32    `json:"mean_frequency,omitempty"`

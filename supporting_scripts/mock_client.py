@@ -59,7 +59,7 @@ def read_ble_data():
                     print(parsed)
                 elif parsed.get('packets') is not None:
                     for item in parsed.get('packets'):
-                        if item.get('muscle_sensor') is not None:
+                        if item.get('muscle_sensor') is True:
                             continue
                         if first_row:
                             sensor_writer.writerow(item.keys())
