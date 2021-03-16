@@ -8,11 +8,11 @@ import (
 // connecting to
 func RetrieveValidBlunos() []*bluno.Bluno {
 	return []*bluno.Bluno{
-		&blunoOne,
+		//&blunoOne,
 		// &blunoTwo,
 		// &blunoThree,
 		// &blunoFour,
-		// &blunoFive,
-		// &blunoSix,
+		&blunoFive,
+		&blunoSix,
 	}
 }

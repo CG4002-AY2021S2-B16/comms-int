@@ -310,12 +310,8 @@ func getMuscleSensorReading(b *Bluno, resp []byte, lower uint8, upper uint8) *ui
 // MAV = mean absolute value
 // RMS = root mean square
 // MNF = mean frequency
-func getEMGSensorData(b *Bluno, resp []byte) {
-	MAV := fourByteToFloat(resp, 4)
-	RMS := fourByteToFloat(resp, 8)
-	MNF := fourByteToFloat(resp, 12)
-
-	log.Println(MAV, RMS, MNF)
+func getEMGSensorData(b *Bluno, resp []byte) (float32, float32, float32) {
+	return fourByteToFloat(resp, 4), fourByteToFloat(resp, 8), fourByteToFloat(resp, 12)
 }
 
 func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
@@ -338,14 +334,14 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 		Pitch:        twoByteToNum(resp, 10),
 		Roll:         twoByteToNum(resp, 12),
 		Yaw:          twoByteToNum(resp, 14),
-		MuscleSensor: nil,
+		MuscleSensor: false,
 		Type:         t,
 		BlunoNumber:  b.Num,
 	}
 
 	if t == commsintconfig.DataEMG {
-		getEMGSensorData(b, resp)
-		pkt.MuscleSensor = getMuscleSensorReading(b, resp, 16, 17) // DEPRECATED
+		pkt.MuscleSensor = true
+		pkt.MAV, pkt.RMS, pkt.MNF = getEMGSensorData(b, resp)
 	}
 	return pkt
 }
