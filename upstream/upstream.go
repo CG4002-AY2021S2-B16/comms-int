@@ -91,6 +91,7 @@ func writeTimestamps(oConn net.Conn) func() {
 	var bt blunoTimestamps = blunoTimestamps{Timestamps: make([]timestamp, 0)}
 
 	return func() {
+		bt.Timestamps = nil
 		for _, b := range constants.RetrieveValidBlunos() {
 			bt.Timestamps = append(bt.Timestamps, timestamp{
 				BlunoNum: b.Num,
