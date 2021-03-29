@@ -54,8 +54,8 @@ class Client():
         return decrypted_message
 
     def send_ultra96(self, message):
-        # encrypted_message = self.encrypt_message(message)
-        encrypted_message = (message + "@").encode('utf8')
+        encrypted_message = self.encrypt_message(message).decode('utf8')
+        encrypted_message = (encrypted_message + "@").encode('utf8')
 
         try:
             self.ultra96socket.sendall(encrypted_message)
@@ -108,6 +108,9 @@ class Client():
                 self.bluno_connected.clear()
                 print("Connection to Ultra96 reset, trying to reconnect...")
                 break
+            except json.JSONDecodeError as e:
+                print("ERR!", e)
+                print(data)
 
     def run(self):
         # Open tunnel to ultra96
