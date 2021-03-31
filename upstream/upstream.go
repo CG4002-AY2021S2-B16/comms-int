@@ -93,11 +93,24 @@ func writeTimestamps(oConn net.Conn) func() {
 	return func() {
 		bt.Timestamps = nil
 		for _, b := range constants.RetrieveValidBlunos() {
-			bt.Timestamps = append(bt.Timestamps, timestamp{
-				BlunoNum: b.Num,
-				Ttwo:     b.HandShakeInit.UnixNano() / int64(time.Millisecond),
-				Tthree:   b.HandshakedAt.UnixNano() / int64(time.Millisecond),
-			})
+			if b.Num == 4 {
+				continue
+			}
+
+			displacement := time.Now().Sub(b.HandshakedAt)
+			if b.HandshakedAt.IsZero() {
+				bt.Timestamps = append(bt.Timestamps, timestamp{
+					BlunoNum: b.Num,
+					Ttwo:     b.HandShakeInit.UnixNano() / int64(time.Millisecond),
+					Tthree:   b.HandshakedAt.UnixNano() / int64(time.Millisecond),
+				})
+			} else {
+				bt.Timestamps = append(bt.Timestamps, timestamp{
+					BlunoNum: b.Num,
+					Ttwo:     b.HandShakeInit.UnixNano()/int64(time.Millisecond) + displacement.Milliseconds(),
+					Tthree:   b.HandshakedAt.UnixNano()/int64(time.Millisecond) + displacement.Milliseconds(),
+				})
+			}
 		}
 		msg, err := json.Marshal(bt)
 		if err != nil {
