@@ -62,6 +62,9 @@ func main() {
 				go outBuf.EnqueueChannelProcessor(as.MasterCtx)
 				go outBuf.DequeueProcessor(as.MasterCtx, us)
 
+				// Write out number of blunos
+				us.WriteBlunoMapping()
+
 				// Start application
 				go startApp(as, outBuf.EnqueueBuffer)
 

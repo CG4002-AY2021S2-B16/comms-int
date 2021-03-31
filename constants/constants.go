@@ -35,6 +35,7 @@ var blunoOne bluno.Bluno = bluno.Bluno{
 	Name:         "BlunoOne",
 	Num:          1,
 	HandshakedAt: time.Time{},
+	User:         Elston,
 }
 
 var blunoTwo bluno.Bluno = bluno.Bluno{
@@ -42,6 +43,7 @@ var blunoTwo bluno.Bluno = bluno.Bluno{
 	Name:         "BlunoTwo",
 	Num:          2,
 	HandshakedAt: time.Time{},
+	User:         Tamelly,
 }
 
 var blunoThree bluno.Bluno = bluno.Bluno{
@@ -49,6 +51,7 @@ var blunoThree bluno.Bluno = bluno.Bluno{
 	Name:         "BlunoThree",
 	Num:          3,
 	HandshakedAt: time.Time{},
+	User:         Matthew,
 }
 
 var blunoFour bluno.Bluno = bluno.Bluno{
@@ -56,6 +59,7 @@ var blunoFour bluno.Bluno = bluno.Bluno{
 	Name:         "BlunoFour",
 	Num:          4,
 	HandshakedAt: time.Time{},
+	User:         Sujay,
 }
 
 var blunoFive bluno.Bluno = bluno.Bluno{
@@ -63,6 +67,7 @@ var blunoFive bluno.Bluno = bluno.Bluno{
 	Name:         "BlunoFive",
 	Num:          5,
 	HandshakedAt: time.Time{},
+	User:         ZiYun,
 }
 
 var blunoSix bluno.Bluno = bluno.Bluno{
@@ -70,4 +75,5 @@ var blunoSix bluno.Bluno = bluno.Bluno{
 	Name:         "BlunoSix",
 	Num:          6,
 	HandshakedAt: time.Time{},
+	User:         Denise,
 }

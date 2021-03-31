@@ -15,11 +15,12 @@ import (
 // IOHandler is a wrapper for a IO
 type IOHandler struct {
 	sync.Mutex
-	ReadChan       chan string
-	WriteRoutine   func(p *[]commsintconfig.Packet)
-	WriteTimestamp func()
-	sent           int
-	received       int
+	ReadChan          chan string
+	WriteRoutine      func(p *[]commsintconfig.Packet)
+	WriteTimestamp    func()
+	WriteBlunoMapping func()
+	sent              int
+	received          int
 }
 
 // Instruction is an incoming message from upstream
@@ -60,6 +61,7 @@ func NewUpstreamConnection() (*IOHandler, error) {
 	}
 	ioh.WriteRoutine = writeRoutine(outgoing)
 	ioh.WriteTimestamp = writeTimestamps(outgoing)
+	ioh.WriteBlunoMapping = writeBlunoMapping(outgoing)
 
 	incoming, err := incomingListener.Accept()
 	log.Printf("upstream|incoming_listener_accept")
@@ -72,6 +74,40 @@ func NewUpstreamConnection() (*IOHandler, error) {
 	go readRoutine(incoming, inc)
 
 	return ioh, nil
+}
+
+// writeBlunoMapping sends names associated with blunos that are expected to connect
+func writeBlunoMapping(oConn net.Conn) func() {
+	oConn.SetWriteDeadline(time.Time{}) // Set to zero (no timeout)
+
+	type blunoMapEntry struct {
+		Num  uint8  `json:"num"`
+		Name string `json:"username"`
+	}
+
+	type blunoMapping struct {
+		Mapping []blunoMapEntry `json:"bluno_mapping"`
+	}
+
+	return func() {
+		var bm blunoMapping
+
+		for _, b := range constants.RetrieveValidBlunos() {
+			bme := blunoMapEntry{Num: b.Num, Name: b.User}
+			bm.Mapping = append(bm.Mapping, bme)
+		}
+
+		bmj, err := json.Marshal(bm)
+		if err != nil {
+			log.Printf("upstream|write_bluno_count_marshal|err=%s", err)
+		} else {
+			_, err := oConn.Write(bmj)
+			if err != nil {
+				log.Printf("upstream|write_bluno_count|err=%s", err)
+				return
+			}
+		}
+	}
 }
 
 // writeTimestamps sends t2, t3 for each active bluno when a time sync request is received
@@ -93,7 +129,7 @@ func writeTimestamps(oConn net.Conn) func() {
 	return func() {
 		bt.Timestamps = nil
 		for _, b := range constants.RetrieveValidBlunos() {
-			if b.Num == 4 {
+			if b.Num == 4 { // this is hardcoded to prevent EMG timestamps
 				continue
 			}
 

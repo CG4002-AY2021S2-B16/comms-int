@@ -18,6 +18,7 @@ type Bluno struct {
 	Address                string     `json:"address"`
 	Name                   string     `json:"name"`
 	Num                    uint8      `json:"num"`
+	User                   string     `json:"user"`
 	Client                 ble.Client `json:"client"`
 	PacketsReceived        uint32     `json:"packets_received"`
 	HandshakeAcknowledged  bool       `json:"handshake_acknowledged"`
