@@ -103,6 +103,7 @@ type Packet struct {
 	Yaw          int16      `json:"yaw"`
 	Type         PacketType `json:"-"`
 	BlunoNumber  uint8      `json:"bluno"`
+	Movement     int8       `json:"movement"`
 	MuscleSensor bool       `json:"muscle_sensor"` // If this key is present, ignore the 6 IMU values - they are dummy readings.
 	MAV          float32    `json:"mean_absolute_value,omitempty"`
 	RMS          float32    `json:"root_mean_square,omitempty"`
@@ -110,7 +111,7 @@ type Packet struct {
 }
 
 func (p Packet) String() string {
-	s := fmt.Sprintf("Timestamp: %d X:%d Y:%d Z:%d Pitch:%d Roll:%d Yaw:%d Type:%d BlunoNumber:%d",
+	s := fmt.Sprintf("Timestamp: %d X:%d Y:%d Z:%d Pitch:%d Roll:%d Yaw:%d Type:%d BlunoNumber:%d Movement:%d",
 		p.Timestamp,
 		p.X,
 		p.Y,
@@ -120,6 +121,7 @@ func (p Packet) String() string {
 		p.Yaw,
 		p.Type,
 		p.BlunoNumber,
+		p.Movement,
 	)
 
 	if p.MuscleSensor {
@@ -191,3 +193,17 @@ func CreateBlockCiphers() (cipher.Block, cipher.Block) {
 	cTwo, _ := aes.NewCipher([]byte{0x7A, 0x24, 0x43, 0x26, 0x46, 0x29, 0x4A, 0x40, 0x4E, 0x63, 0x52, 0x66, 0x55, 0x6A, 0x57, 0x6E})
 	return cOne, cTwo
 }
+
+type LateralShift int8
+
+const (
+	LeftShift LateralShift = -1
+
+	RightShift LateralShift = 1
+
+	NoShiftIndicated LateralShift = 0
+)
+
+const IndicationThreshold = 500
+
+const IndicationActivationCount = 10

@@ -32,6 +32,8 @@ type Bluno struct {
 	StartTime              time.Time  `json:"start_time"`
 	Buffer                 *list.List `json:"response_buffer"`
 	StateUpdateChan        chan commsintconfig.BlunoStatus
+	LeftIndication         uint8
+	RightIndication        uint8
 }
 
 // Connect establishes a connection with the physical bluno
@@ -221,6 +223,8 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 				hsFail <- true
 			} else {
 				b.PacketsImmSuccess++
+				b.resetLeftIndicator()
+				b.resetRightIndicator()
 			}
 		default:
 			if b.HandshakeAcknowledged == false {
@@ -315,6 +319,33 @@ func getEMGSensorData(b *Bluno, resp []byte) (float32, float32, float32) {
 	return fourByteToFloat(resp, 4), fourByteToFloat(resp, 8), fourByteToFloat(resp, 12)
 }
 
+func (b *Bluno) updateBlunoMovementIndicator(p *commsintconfig.Packet, target int16) {
+	if target < commsintconfig.IndicationThreshold && target > -commsintconfig.IndicationThreshold {
+		b.resetLeftIndicator()
+		b.resetRightIndicator()
+	} else if target < -commsintconfig.IndicationThreshold { // Left
+		b.resetRightIndicator()
+		b.LeftIndication++
+		if b.LeftIndication >= commsintconfig.IndicationActivationCount {
+			p.Movement = int8(commsintconfig.LeftShift)
+		}
+	} else if target > commsintconfig.IndicationThreshold {
+		b.resetLeftIndicator()
+		b.RightIndication++
+		if b.RightIndication >= commsintconfig.IndicationActivationCount {
+			p.Movement = int8(commsintconfig.RightShift)
+		}
+	}
+}
+
+func (b *Bluno) resetLeftIndicator() {
+	b.LeftIndication = 0
+}
+
+func (b *Bluno) resetRightIndicator() {
+	b.RightIndication = 0
+}
+
 func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 	if !calculateChecksum(resp) {
 		return commsintconfig.Packet{Type: commsintconfig.Invalid}
@@ -338,12 +369,15 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 		MuscleSensor: false,
 		Type:         t,
 		BlunoNumber:  b.Num,
+		Movement:     0,
 	}
 
 	if t == commsintconfig.DataEMG {
 		pkt.MuscleSensor = true
 		pkt.MAV, pkt.RMS, pkt.MNF = getEMGSensorData(b, resp)
 	}
+
+	b.updateBlunoMovementIndicator(&pkt, pkt.Pitch)
 	return pkt
 }
 
@@ -406,4 +440,6 @@ func (b *Bluno) SetClient(c *ble.Client) {
 	b.StartTime = time.Now()
 	b.LastPacketReceivedAt = time.Now()
 	b.Buffer = list.New()
+	b.resetLeftIndicator()
+	b.resetRightIndicator()
 }
