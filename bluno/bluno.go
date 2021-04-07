@@ -34,6 +34,8 @@ type Bluno struct {
 	StateUpdateChan        chan commsintconfig.BlunoStatus
 	LeftIndication         uint8
 	RightIndication        uint8
+	LeftSent               uint8
+	RightSent              uint8
 }
 
 // Connect establishes a connection with the physical bluno
@@ -319,20 +321,27 @@ func getEMGSensorData(b *Bluno, resp []byte) (float32, float32, float32) {
 	return fourByteToFloat(resp, 4), fourByteToFloat(resp, 8), fourByteToFloat(resp, 12)
 }
 
-func (b *Bluno) updateBlunoMovementIndicator(p *commsintconfig.Packet, target int16) {
-	if target < commsintconfig.IndicationThreshold && target > -commsintconfig.IndicationThreshold {
+func checkValWithinThreshold(val int16) bool {
+	return (val < commsintconfig.IndicationThreshold) && (val > -commsintconfig.IndicationThreshold)
+
+}
+
+func (b *Bluno) updateBlunoMovementIndicator(p *commsintconfig.Packet) {
+	if checkValWithinThreshold(p.Pitch) {
 		b.resetLeftIndicator()
 		b.resetRightIndicator()
-	} else if target < -commsintconfig.IndicationThreshold { // Left
+	} else if p.Pitch < -commsintconfig.IndicationThreshold && checkValWithinThreshold(p.Roll) && checkValWithinThreshold(p.Yaw) { // Left
 		b.resetRightIndicator()
 		b.LeftIndication++
 		if b.LeftIndication >= commsintconfig.IndicationActivationCount {
+			b.LeftSent++
 			p.Movement = int8(commsintconfig.LeftShift)
 		}
-	} else if target > commsintconfig.IndicationThreshold {
+	} else if p.Pitch > commsintconfig.IndicationThreshold && checkValWithinThreshold(p.Roll) && checkValWithinThreshold(p.Yaw) { // Right
 		b.resetLeftIndicator()
 		b.RightIndication++
 		if b.RightIndication >= commsintconfig.IndicationActivationCount {
+			b.RightSent++
 			p.Movement = int8(commsintconfig.RightShift)
 		}
 	}
@@ -377,7 +386,7 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 		pkt.MAV, pkt.RMS, pkt.MNF = getEMGSensorData(b, resp)
 	}
 
-	b.updateBlunoMovementIndicator(&pkt, pkt.Pitch)
+	b.updateBlunoMovementIndicator(&pkt)
 	return pkt
 }
 
@@ -425,6 +434,12 @@ func (b *Bluno) PrintStats() {
 		float64(adjIncorrectLength)/float64(b.PacketsReceived),
 		float64(b.PacketsInvalidType)/float64(b.PacketsReceived),
 	)
+
+	fmt.Printf("Counts %d %d\n",
+		b.LeftSent,
+		b.RightSent,
+	)
+
 	fmt.Printf("--------------------------------\nEnd of statistics for %s\n--------------------------------", b.Name)
 }
 
@@ -442,4 +457,6 @@ func (b *Bluno) SetClient(c *ble.Client) {
 	b.Buffer = list.New()
 	b.resetLeftIndicator()
 	b.resetRightIndicator()
+	b.LeftSent = 0
+	b.RightSent = 0
 }

@@ -65,7 +65,7 @@ var blunoFour bluno.Bluno = bluno.Bluno{
 var blunoFive bluno.Bluno = bluno.Bluno{
 	Address:      "80:30:DC:D9:23:4C",
 	Name:         "BlunoFive",
-	Num:          5,
+	Num:          1,
 	HandshakedAt: time.Time{},
 	User:         ZiYun,
 }
@@ -73,7 +73,7 @@ var blunoFive bluno.Bluno = bluno.Bluno{
 var blunoSix bluno.Bluno = bluno.Bluno{
 	Address:      "80:30:DC:D9:23:40",
 	Name:         "BlunoSix",
-	Num:          6,
+	Num:          2,
 	HandshakedAt: time.Time{},
 	User:         Denise,
 }

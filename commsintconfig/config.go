@@ -204,6 +204,6 @@ const (
 	NoShiftIndicated LateralShift = 0
 )
 
-const IndicationThreshold = 500
+const IndicationThreshold = 1200
 
-const IndicationActivationCount = 10
+const IndicationActivationCount = 9

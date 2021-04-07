@@ -100,6 +100,7 @@ def write_data_to_csv(user_name, mq):
         print(f"writing to csv file: {f_name}")
 
         start = None
+        counts = {-1:0, 0:0, 1: 0}
 
         while True:
             item = mq.get()
@@ -116,6 +117,8 @@ def write_data_to_csv(user_name, mq):
                 sensor_writer.writerow(item.keys())
                 first_row = False
 
+            counts[item.get('movement')] += 1
+
             sensor_writer.writerow(item.values())
    
         if start is None:
@@ -123,6 +126,7 @@ def write_data_to_csv(user_name, mq):
         else:
             delta = (datetime.datetime.utcnow() - start).total_seconds()
 
+    print("bluno", user_name, "counts", counts)
     os.rename(f_name, f"{init_time}_{user_name}_{delta}sec.csv")
 
 
