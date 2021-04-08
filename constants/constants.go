@@ -23,9 +23,6 @@ var BlunoStatusCheckFreq time.Duration = 5000 * time.Millisecond
 // UpstreamResumeMsg is the expected indication to resume the application
 var UpstreamResumeMsg string = "resume"
 
-// UpstreamPauseMsg is the expected indication to pause the application
-var UpstreamPauseMsg string = "pause"
-
 // UpstreamNotifBufferSize refers to the max number of bytes to be read in for an incoming notif
 var UpstreamNotifBufferSize int = 1000
 
@@ -65,7 +62,7 @@ var blunoFour bluno.Bluno = bluno.Bluno{
 var blunoFive bluno.Bluno = bluno.Bluno{
 	Address:      "80:30:DC:D9:23:4C",
 	Name:         "BlunoFive",
-	Num:          1,
+	Num:          5,
 	HandshakedAt: time.Time{},
 	User:         ZiYun,
 }
@@ -73,7 +70,7 @@ var blunoFive bluno.Bluno = bluno.Bluno{
 var blunoSix bluno.Bluno = bluno.Bluno{
 	Address:      "80:30:DC:D9:23:40",
 	Name:         "BlunoSix",
-	Num:          2,
+	Num:          6,
 	HandshakedAt: time.Time{},
 	User:         Denise,
 }

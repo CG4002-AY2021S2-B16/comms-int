@@ -2,6 +2,7 @@ package upstream
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -93,7 +94,7 @@ func writeBlunoMapping(oConn net.Conn) func() {
 		var bm blunoMapping
 
 		for _, b := range constants.RetrieveValidBlunos() {
-			bme := blunoMapEntry{Num: b.Num, Name: b.User}
+			bme := blunoMapEntry{Num: b.Num, Name: fmt.Sprintf("%s_%d", b.User, b.Num)}
 			bm.Mapping = append(bm.Mapping, bme)
 		}
 
@@ -129,11 +130,10 @@ func writeTimestamps(oConn net.Conn) func() {
 	return func() {
 		bt.Timestamps = nil
 		for _, b := range constants.RetrieveValidBlunos() {
-			if b.Num == 4 { // this is hardcoded to prevent EMG timestamps
+			if b.Num > 3 { // this is hardcoded to prevent EMG timestamps
 				continue
 			}
 
-			displacement := time.Now().Sub(b.HandshakedAt)
 			if b.HandshakedAt.IsZero() {
 				bt.Timestamps = append(bt.Timestamps, timestamp{
 					BlunoNum: b.Num,
@@ -141,6 +141,7 @@ func writeTimestamps(oConn net.Conn) func() {
 					Tthree:   b.HandshakedAt.UnixNano() / int64(time.Millisecond),
 				})
 			} else {
+				displacement := time.Now().Sub(b.HandshakedAt)
 				bt.Timestamps = append(bt.Timestamps, timestamp{
 					BlunoNum: b.Num,
 					Ttwo:     b.HandShakeInit.UnixNano()/int64(time.Millisecond) + displacement.Milliseconds(),

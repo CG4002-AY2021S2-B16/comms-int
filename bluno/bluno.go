@@ -75,8 +75,6 @@ func (b *Bluno) Connect(pCtx context.Context, m chan bool, done chan bool) {
 // Listen receives incoming connections from bluno
 // - to be called inside a goroutine
 func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), done chan bool) {
-	defer b.Client.CancelConnection()
-
 	// Perform targeted find of characteristic
 	svcUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoServiceReducedUUID), ble.MustParse(commsintconfig.BlunoServiceUUID)}
 	charUUID := []ble.UUID{ble.UUID16(commsintconfig.BlunoCharacteristicReducedUUID), ble.MustParse(commsintconfig.BlunoCharacteristicUUID)}
@@ -89,6 +87,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 			log.Printf("client_svc_discovery_err|addr=%s|err=%s|len_svcs=%d", b.Address, err, len(s))
 		}
 		done <- false
+		b.Client.CancelConnection()
 		return
 	}
 
@@ -99,6 +98,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 			log.Printf("client_char_discovery_err|addr=%s|err=%s|num_characteristics=%d", b.Address, err, len(c))
 		}
 		done <- false
+		b.Client.CancelConnection()
 		return
 	}
 
@@ -116,6 +116,7 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 	if err != nil {
 		log.Printf("client_subscription_err|addr=%s|err=%s", b.Address, err)
 		done <- false
+		b.Client.CancelConnection()
 		return
 	}
 	defer b.Client.Unsubscribe(characteristic, false)
@@ -126,6 +127,9 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 	err = b.Client.WriteCharacteristic(characteristic, toSend, false)
 	if err != nil {
 		log.Printf("write_handshake|err=%s", err)
+		done <- false
+		b.Client.CancelConnection()
+		return
 	}
 	b.HandShakeInit = time.Now()
 	log.Printf("Handshake sent to %s (%s)|[ %X ]", b.Name, b.Address, toSend)
@@ -156,7 +160,6 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 					b.LastPacketReceivedAt,
 					t,
 				)
-				b.StateUpdateChan <- commsintconfig.NotConnected
 				b.Client.CancelConnection()
 			}
 		case et := <-establishTickChan.C:
@@ -168,7 +171,6 @@ func (b *Bluno) Listen(pCtx context.Context, wr func(commsintconfig.Packet), don
 					b.LastPacketReceivedAt,
 					et,
 				)
-				b.StateUpdateChan <- commsintconfig.NotConnected
 				b.Client.CancelConnection()
 			}
 		case <-pCtx.Done():

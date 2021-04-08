@@ -8,7 +8,6 @@ import (
 
 // ReconcilePacket attempts to recombine and parse packets that have been fragmented into two pieces, using a LIFO strategy
 // It works on a best effort basis and can allow false positives through (albeit unlikely based on observations)
-// TODO: Can be enhanced once error detection is also implemented
 func (b *Bluno) ReconcilePacket(curr []byte) (commsintconfig.Packet, bool) {
 	// Successful reconciliation if buffer is non-empty, len(prev) + len(curr) == 19, and curr.first is an invalid packetType
 	if b.Buffer.Len() > 0 {

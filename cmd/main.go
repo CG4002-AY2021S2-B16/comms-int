@@ -107,7 +107,6 @@ func startApp(as *appstate.AppState, wr func(commsintconfig.Packet)) {
 						connected = success
 					case <-as.MasterCtx.Done():
 						<-connChan // Await safe termination of connect attempt
-						log.Println("what:", clientCreation)
 						wg.Done()
 						return
 					}
