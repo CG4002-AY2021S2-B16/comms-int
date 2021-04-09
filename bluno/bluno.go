@@ -34,8 +34,11 @@ type Bluno struct {
 	StateUpdateChan        chan commsintconfig.BlunoStatus
 	LeftIndication         uint8
 	RightIndication        uint8
+	NotSentIndication      uint8
 	LeftSent               uint8
 	RightSent              uint8
+
+	lastSent time.Time
 }
 
 // Connect establishes a connection with the physical bluno
@@ -332,19 +335,30 @@ func (b *Bluno) updateBlunoMovementIndicator(p *commsintconfig.Packet) {
 	if checkValWithinThreshold(p.Pitch) {
 		b.resetLeftIndicator()
 		b.resetRightIndicator()
+		b.NotSentIndication++
+		if b.NotSentIndication >= commsintconfig.IndicationNotSentActivationCount {
+			b.lastSent = time.Unix(0, 0) // Reset back to unix
+		}
+
 	} else if p.Pitch < -commsintconfig.IndicationThreshold && checkValWithinThreshold(p.Roll) && checkValWithinThreshold(p.Yaw) { // Left
 		b.resetRightIndicator()
+		b.resetNotSentIndicator()
 		b.LeftIndication++
-		if b.LeftIndication >= commsintconfig.IndicationActivationCount {
+		if (time.Now().Sub(b.lastSent) < commsintconfig.ReducedThresholdAllowance && b.LeftIndication >= commsintconfig.IndicationLeftReducedActivationCount) ||
+			b.LeftIndication >= commsintconfig.IndicationLeftActivationCount {
 			b.LeftSent++
 			p.Movement = int8(commsintconfig.LeftShift)
+			b.lastSent = time.Now()
 		}
 	} else if p.Pitch > commsintconfig.IndicationThreshold && checkValWithinThreshold(p.Roll) && checkValWithinThreshold(p.Yaw) { // Right
 		b.resetLeftIndicator()
+		b.resetNotSentIndicator()
 		b.RightIndication++
-		if b.RightIndication >= commsintconfig.IndicationActivationCount {
+		if (time.Now().Sub(b.lastSent) < commsintconfig.ReducedThresholdAllowance && b.RightIndication >= commsintconfig.IndicationRightReducedActivationCount) ||
+			(b.RightIndication >= commsintconfig.IndicationRightActivationCount) {
 			b.RightSent++
 			p.Movement = int8(commsintconfig.RightShift)
+			b.lastSent = time.Now()
 		}
 	}
 }
@@ -355,6 +369,10 @@ func (b *Bluno) resetLeftIndicator() {
 
 func (b *Bluno) resetRightIndicator() {
 	b.RightIndication = 0
+}
+
+func (b *Bluno) resetNotSentIndicator() {
+	b.NotSentIndication = 0
 }
 
 func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
@@ -459,6 +477,8 @@ func (b *Bluno) SetClient(c *ble.Client) {
 	b.Buffer = list.New()
 	b.resetLeftIndicator()
 	b.resetRightIndicator()
+	b.resetNotSentIndicator()
 	b.LeftSent = 0
 	b.RightSent = 0
+	b.lastSent = time.Now()
 }

@@ -206,4 +206,11 @@ const (
 
 const IndicationThreshold = 1200
 
-const IndicationActivationCount = 9
+const (
+	IndicationLeftActivationCount         = 5
+	IndicationRightActivationCount        = 8
+	IndicationNotSentActivationCount      = 8
+	IndicationLeftReducedActivationCount  = 4
+	IndicationRightReducedActivationCount = 4
+	ReducedThresholdAllowance             = 6 * time.Second
+)
