@@ -244,16 +244,15 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 	}
 }
 
-// determinePacketType returns the packet's type based on the 3rd and 4th bit of the 18th byte of the response
+// determinePacketType returns the packet's type based on the 1st and 2nd bit of the 1st byte of the response
 func determinePacketType(d []byte) commsintconfig.PacketType {
-	if d[17]|commsintconfig.RespHandshakeSymbol == commsintconfig.RespHandshakeSymbol { // 00
+	if d[0] == commsintconfig.RespHandshakeSymbol {
 		return commsintconfig.Ack
-	} else if d[17]&commsintconfig.RespDataSymbol == commsintconfig.RespDataSymbol { // 1X
-		if d[17]&commsintconfig.NonMuscleSensorSymbol == commsintconfig.NonMuscleSensorSymbol { // 11
-			return commsintconfig.Data
-		}
-		return commsintconfig.DataEMG // 10
-	} else if d[17]&commsintconfig.RespLivenessSymbol == commsintconfig.RespLivenessSymbol { // 01
+	} else if d[0] == commsintconfig.EMGDataSymbol {
+		return commsintconfig.DataEMG
+	} else if d[0] == commsintconfig.IMUDataSymbol {
+		return commsintconfig.DataIMU
+	} else if d[0] == commsintconfig.RespLivenessSymbol {
 		return commsintconfig.Liveness
 	}
 	return commsintconfig.Invalid
@@ -286,24 +285,22 @@ func calculateChecksum(d []byte) bool {
 
 // decryptPacket takes an encrypted complete packet and performs
 // aes decryption in the following manner:
-// enc -> decrypt bytes 2 to 17 using stage 2 AES key
 // decrypt bytes 0 to 15 using stage 1 AES key
 func decryptPacket(resp []byte) []byte {
 	temp := make([]byte, commsintconfig.AESSize)
-	cOne, cTwo := commsintconfig.CreateBlockCiphers()
-
-	// StageTwoDecryptor is used to decrypt the packet from stage 2 (second group of 16 bytes are encrypted) to stage 1 (first 16 bytes are encrypted)
-	cTwo.Decrypt(temp, resp[commsintconfig.StageTwoOffset:commsintconfig.StageTwoOffset+commsintconfig.AESSize])
-	stageTwo := append(append(resp[:commsintconfig.StageTwoOffset], temp...), resp[commsintconfig.ExpectedPacketSize-1])
+	cOne := commsintconfig.CreateBlockCipher()
 
 	// StageOneDecryptor is used to decrypt the packet from stage 1 (first 16 bytes are encrypted) to stage 0 (plaintext)
-	cOne.Decrypt(temp, stageTwo)
-	return append(temp, stageTwo[commsintconfig.AESSize:]...)
+	cOne.Decrypt(temp, resp)
+
+	return append(temp, resp[commsintconfig.AESSize:]...)
 }
 
 // formTimestamp takes in a bluno, a packet and performs unix timestamp creation
 func formTimestamp(b *Bluno, resp []byte, start uint8) time.Time {
-	ts := time.Millisecond * time.Duration(binary.LittleEndian.Uint32(resp[start:start+4]))
+	// only 3 bytes are dedicated for timestamps, last byte should be mimicked using all zeroes
+	ba := append(resp[start:start+3], byte(0))
+	ts := time.Millisecond * time.Duration(binary.LittleEndian.Uint32(ba))
 	delta := time.Duration(int64(b.HandshakedAt.Sub(b.HandShakeInit)) / 2)
 	return b.HandShakeInit.Add(delta).Add(ts)
 }
@@ -383,25 +380,25 @@ func constructPacket(b *Bluno, resp []byte) commsintconfig.Packet {
 	resp = decryptPacket(resp)
 
 	t := determinePacketType(resp)
-	if t == commsintconfig.Ack {
-		b.HandshakedAt = time.Now()
-	}
 
 	pkt := commsintconfig.Packet{
-		Timestamp:    formTimestamp(b, resp, 0).UnixNano() / int64(time.Millisecond),
-		X:            twoByteToNum(resp, 4),
-		Y:            twoByteToNum(resp, 6),
-		Z:            twoByteToNum(resp, 8),
-		Pitch:        twoByteToNum(resp, 10),
-		Roll:         twoByteToNum(resp, 12),
-		Yaw:          twoByteToNum(resp, 14),
+		Timestamp:    formTimestamp(b, resp, 1).UnixNano() / int64(time.Millisecond),
 		MuscleSensor: false,
 		Type:         t,
 		BlunoNumber:  b.Num,
 		Movement:     0,
 	}
 
-	if t == commsintconfig.DataEMG {
+	if t == commsintconfig.Ack {
+		b.HandshakedAt = time.Now()
+	} else if t == commsintconfig.DataIMU {
+		pkt.X = twoByteToNum(resp, 4)
+		pkt.Y = twoByteToNum(resp, 6)
+		pkt.Z = twoByteToNum(resp, 8)
+		pkt.Pitch = twoByteToNum(resp, 10)
+		pkt.Roll = twoByteToNum(resp, 12)
+		pkt.Yaw = twoByteToNum(resp, 14)
+	} else if t == commsintconfig.DataEMG {
 		pkt.MuscleSensor = true
 		pkt.MAV, pkt.RMS, pkt.MNF = getEMGSensorData(b, resp)
 	}

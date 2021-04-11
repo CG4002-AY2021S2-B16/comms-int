@@ -10,9 +10,9 @@ func RetrieveValidBlunos() []*bluno.Bluno {
 	return []*bluno.Bluno{
 		//&blunoOne,
 		//&blunoTwo,
-		&blunoThree,
+		//&blunoThree,
 		//&blunoFour,
-		&blunoFive,
+		//&blunoFive,
 		&blunoSix,
 	}
 }

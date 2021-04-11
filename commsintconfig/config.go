@@ -50,31 +50,30 @@ var ClientCharacteristicConfig uint16 = 0x2902
 var InitHandshakeSymbol byte = 'A'
 
 // RespHandshakeSymbol is the symbol received from a successful handshake attempt
-// We can OR the 17th byte received with this to see if it returns the same value.
+// We can AND the 1st byte received with this to see if it returns the same value.
 // If so, the packet is indeed an ACK packet.
-var RespHandshakeSymbol byte = 0xF3
+var RespHandshakeSymbol byte = 0x00
 
 // RespLivenessSymbol is the symbol received from a successful liveness packet.
-// We can AND the 17th byte received to see if it returns the same value.
+// We can AND the 1st byte received to see if it returns the same value.
 // If so, the packet is indeed a Liveness packet.
-var RespLivenessSymbol byte = 0x04
+var RespLivenessSymbol byte = 0xC0
 
 // RespDataSymbol is the symbol received from a successful data response.
-// We can AND the 17th byte received with this to see if it returns the same value.
-// If so, the packet is indeed a Data packet.
-// NOTE: A further check for 0x04 should be done to determine if muscle sensor data is available or not.
-var RespDataSymbol byte = 0x08
+// We can AND the 1st byte received with this to see if it returns the same value.
+// If so, the packet is indeed a IMUData packet.
+var IMUDataSymbol byte = 0x40
 
 // NonMuscleSensorSymbol is the symbol associated with an incoming data packet that does not have muscle sensor attached.
-// We can AND the 17th byte received with this to see if it returns the same value.
+// We can AND the 1st byte received with this to see if it returns the same value.
 // If so, the packet is a Data packet that does not contain a valid muscle sensor value.
-var NonMuscleSensorSymbol byte = 0x04
+var EMGDataSymbol byte = 0x80
 
 // ADCmask is the mask used to extract upper 2 bits for the 10-bit muscle sensor ADC reading from an incoming packet
 var ADCmask byte = 0x03
 
 // ExpectedPacketSize refers to the number of useful bytes of data within an incoming packet
-var ExpectedPacketSize int = 19
+var ExpectedPacketSize int = 17
 
 // PacketType is an enum type which signifies the type of packet received from the Bluno
 type PacketType uint8
@@ -82,8 +81,8 @@ type PacketType uint8
 const (
 	// Ack is a PacketType that refers to a handshake response
 	Ack PacketType = 0
-	// Data is a PacketType that refers to a response containing data
-	Data PacketType = 1
+	// Data is a PacketType that refers to a response containing IMU data
+	DataIMU PacketType = 1
 	// DataEMG is a PacketType that refers to a response containing EMG data
 	DataEMG PacketType = 2
 	// Liveness is a PacketType that refers to a liveness check packet
@@ -111,20 +110,24 @@ type Packet struct {
 }
 
 func (p Packet) String() string {
-	s := fmt.Sprintf("Timestamp: %d X:%d Y:%d Z:%d Pitch:%d Roll:%d Yaw:%d Type:%d BlunoNumber:%d Movement:%d",
+	s := fmt.Sprintf("Timestamp: %d Type:%d BlunoNumber:%d ",
 		p.Timestamp,
-		p.X,
-		p.Y,
-		p.Z,
-		p.Pitch,
-		p.Roll,
-		p.Yaw,
 		p.Type,
 		p.BlunoNumber,
-		p.Movement,
 	)
 
-	if p.MuscleSensor {
+	if p.Type == DataIMU {
+		return s + fmt.Sprintf(
+			" X:%d Y:%d Z:%d Pitch:%d Roll:%d Yaw:%d Movement:%d ",
+			p.X,
+			p.Y,
+			p.Z,
+			p.Pitch,
+			p.Roll,
+			p.Yaw,
+			p.Movement,
+		)
+	} else if p.Type == DataEMG {
 		return s + fmt.Sprintf(
 			" MuscleSensor active MAV:%f RMS:%f MNF:%f ",
 			p.MAV,
@@ -132,6 +135,7 @@ func (p Packet) String() string {
 			p.MNF,
 		)
 	}
+
 	return s
 }
 
@@ -187,11 +191,10 @@ var AESSize int = 16
 // StageTwoOffset refers to the offset at which the second layer of encryption is performed
 var StageTwoOffset int = 2
 
-// CreateBlockCiphers creates 2 decryption ciphers to decrypt a packet
-func CreateBlockCiphers() (cipher.Block, cipher.Block) {
+// CreateBlockCipher creates a decryption cipher to decrypt a packet
+func CreateBlockCipher() cipher.Block {
 	cOne, _ := aes.NewCipher([]byte{0x2A, 0x46, 0x2D, 0x4A, 0x61, 0x4E, 0x64, 0x52, 0x67, 0x55, 0x6A, 0x58, 0x6E, 0x32, 0x72, 0x35})
-	cTwo, _ := aes.NewCipher([]byte{0x7A, 0x24, 0x43, 0x26, 0x46, 0x29, 0x4A, 0x40, 0x4E, 0x63, 0x52, 0x66, 0x55, 0x6A, 0x57, 0x6E})
-	return cOne, cTwo
+	return cOne
 }
 
 type LateralShift int8
