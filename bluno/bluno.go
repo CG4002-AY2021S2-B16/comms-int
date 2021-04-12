@@ -214,7 +214,7 @@ func (b *Bluno) parseResponse(hsFail chan bool, wr func(commsintconfig.Packet)) 
 			p = constructPacket(b, resp)
 		}
 
-		if commsintconfig.DebugMode {
+		if commsintconfig.DebugMode || p.Movement != 0 {
 			printPacket(&p, resp)
 		}
 

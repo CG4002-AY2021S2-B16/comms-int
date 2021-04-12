@@ -9,8 +9,8 @@ import (
 func RetrieveValidBlunos() []*bluno.Bluno {
 	return []*bluno.Bluno{
 		//&blunoOne,
-		//&blunoTwo,
-		&blunoThree,
+		&blunoTwo,
+		//&blunoThree,
 		//&blunoFour,
 		&blunoFive,
 		&blunoSix,

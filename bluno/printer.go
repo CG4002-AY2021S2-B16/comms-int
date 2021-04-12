@@ -20,6 +20,8 @@ func printPacket(p *commsintconfig.Packet, resp []byte) {
 		cf = color.New(color.FgBlue).SprintFunc()
 	case 4:
 		cf = color.New(color.FgYellow).SprintFunc()
+	case 5:
+		cf = color.New(color.FgCyan).SprintFunc()
 	default:
 		cf = color.New(color.FgMagenta).SprintFunc()
 	}

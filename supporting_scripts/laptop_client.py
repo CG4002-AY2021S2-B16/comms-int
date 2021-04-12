@@ -87,6 +87,14 @@ class Client():
             data = json.dumps({ "cmd": RESUME_CMD })
             print("[LAPTOP -> BLUNO] RESUME receiving data from blunos")
             self.blunosClient.send(data.encode('utf8'))
+        else:
+            try:
+                msg = json.loads(message[:message.rfind("}")] + "}")
+                if msg.get("msg") == "#T 0":
+                    data = json.dumps({ "cmd": RESUME_CMD, "t_one": msg.get("t_one") })
+                    self.blunosClient.send(data.encode('utf8'))
+            except json.JSONDecodeError as e:
+                print(f"Error decoding message from Ultra96: {e}")
     
     # Handle data from bluno
     def blunoToUltra96(self):

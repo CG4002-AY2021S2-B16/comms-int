@@ -16,9 +16,9 @@ import (
 // IOHandler is a wrapper for a IO
 type IOHandler struct {
 	sync.Mutex
-	ReadChan          chan string
+	ReadChan          chan Instruction
 	WriteRoutine      func(p *[]commsintconfig.Packet)
-	WriteTimestamp    func()
+	WriteTimestamp    func(uint64)
 	WriteBlunoMapping func()
 	sent              int
 	received          int
@@ -26,7 +26,8 @@ type IOHandler struct {
 
 // Instruction is an incoming message from upstream
 type Instruction struct {
-	Cmd string `json:"cmd"`
+	Cmd  string `json:"cmd"`
+	Data uint64 `json:"t_one"`
 }
 
 // NewUpstreamConnection creates and returns a new wrapper for input and output sockets
@@ -34,7 +35,7 @@ func NewUpstreamConnection() (*IOHandler, error) {
 	os.Remove(constants.OutgoingDataSock)
 	os.Remove(constants.IncomingNotifSock)
 
-	inc := make(chan string)
+	inc := make(chan Instruction)
 
 	ioh := &IOHandler{
 		ReadChan: inc,
@@ -112,13 +113,14 @@ func writeBlunoMapping(oConn net.Conn) func() {
 }
 
 // writeTimestamps sends t2, t3 for each active bluno when a time sync request is received
-func writeTimestamps(oConn net.Conn) func() {
+func writeTimestamps(oConn net.Conn) func(t_one uint64) {
 	oConn.SetWriteDeadline(time.Time{}) // Set to zero (no timeout)
 
 	type timestamp struct {
-		BlunoNum uint8 `json:"num"`
-		Ttwo     int64 `json:"t_two"`
-		Tthree   int64 `json:"t_three"`
+		OriginalTOne uint64 `json:"t_one"`
+		BlunoNum     uint8  `json:"num"`
+		Ttwo         int64  `json:"t_two"`
+		Tthree       int64  `json:"t_three"`
 	}
 
 	type blunoTimestamps struct {
@@ -127,7 +129,7 @@ func writeTimestamps(oConn net.Conn) func() {
 
 	var bt blunoTimestamps = blunoTimestamps{Timestamps: make([]timestamp, 0)}
 
-	return func() {
+	return func(t_one uint64) {
 		bt.Timestamps = nil
 		for _, b := range constants.RetrieveValidBlunos() {
 			if b.Num > 3 { // this is hardcoded to prevent EMG timestamps
@@ -136,16 +138,18 @@ func writeTimestamps(oConn net.Conn) func() {
 
 			if b.HandshakedAt.IsZero() {
 				bt.Timestamps = append(bt.Timestamps, timestamp{
-					BlunoNum: b.Num,
-					Ttwo:     b.HandShakeInit.UnixNano() / int64(time.Millisecond),
-					Tthree:   b.HandshakedAt.UnixNano() / int64(time.Millisecond),
+					OriginalTOne: t_one,
+					BlunoNum:     b.Num,
+					Ttwo:         b.HandShakeInit.UnixNano() / int64(time.Millisecond),
+					Tthree:       b.HandshakedAt.UnixNano() / int64(time.Millisecond),
 				})
 			} else {
 				displacement := time.Now().Sub(b.HandshakedAt)
 				bt.Timestamps = append(bt.Timestamps, timestamp{
-					BlunoNum: b.Num,
-					Ttwo:     b.HandShakeInit.UnixNano()/int64(time.Millisecond) + displacement.Milliseconds(),
-					Tthree:   b.HandshakedAt.UnixNano()/int64(time.Millisecond) + displacement.Milliseconds(),
+					OriginalTOne: t_one,
+					BlunoNum:     b.Num,
+					Ttwo:         b.HandShakeInit.UnixNano()/int64(time.Millisecond) + displacement.Milliseconds(),
+					Tthree:       b.HandshakedAt.UnixNano()/int64(time.Millisecond) + displacement.Milliseconds(),
 				})
 			}
 		}
@@ -188,7 +192,7 @@ func writeRoutine(oConn net.Conn) func(p *[]commsintconfig.Packet) {
 
 // readRoutine listens to the incoming notifications and sends them
 // out to the main application via the provided channel
-func readRoutine(iConn net.Conn, comm chan string) {
+func readRoutine(iConn net.Conn, comm chan Instruction) {
 	iConn.SetReadDeadline(time.Time{}) // Set to zero (no timeout)
 	var i Instruction
 	b := make([]byte, constants.UpstreamNotifBufferSize)
@@ -205,7 +209,7 @@ func readRoutine(iConn net.Conn, comm chan string) {
 		if err != nil {
 			log.Printf("upstream|read_routine_unmarshal|err=%s|data=%s", err, string(b))
 		} else {
-			comm <- i.Cmd
+			comm <- i
 		}
 	}
 }

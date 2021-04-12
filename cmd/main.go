@@ -55,7 +55,7 @@ func main() {
 	for {
 		select {
 		case msg := <-us.ReadChan:
-			if as.GetState() == commsintconfig.Waiting && msg == constants.UpstreamResumeMsg {
+			if as.GetState() == commsintconfig.Waiting && msg.Cmd == constants.UpstreamResumeMsg {
 				as.SetState(commsintconfig.Running)
 
 				// Start up goroutines
@@ -68,9 +68,9 @@ func main() {
 				// Start application
 				go startApp(as, outBuf.EnqueueBuffer)
 
-			} else if as.GetState() == commsintconfig.Running && msg == constants.UpstreamResumeMsg {
+			} else if as.GetState() == commsintconfig.Running && msg.Cmd == constants.UpstreamResumeMsg {
 				// Send time sync packets
-				us.WriteTimestamp()
+				us.WriteTimestamp(msg.Data)
 			}
 		}
 		log.Printf("Application is now in state %d", as.GetState())
