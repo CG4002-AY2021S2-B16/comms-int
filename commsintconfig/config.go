@@ -8,7 +8,7 @@ import (
 )
 
 // DebugMode enables debug log messages
-var DebugMode bool = false
+var DebugMode bool = true
 
 // ProcessedPacketDisplay allows output packets to be displayed in a colored manner
 var ProcessedPacketDisplay bool = true
