@@ -1,6 +1,6 @@
 # comms int
 
-Containerized Golang application to be run on relay laptops that are in physical proximity of BLE-compatible devices
+Containerized Golang application to be run on relay laptops that are in physical proximity of Bluetooth Low Energy (BLE) devices
 
 - Reliable protocol w/ automatic reconnection
 - Windowed (size is configurable) stream of data to upstream applications (e.g. neural networks)
