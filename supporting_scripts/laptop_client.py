@@ -17,7 +17,7 @@ DATA_SOCK_PATH = "/tmp/www/comms/data.sock"
 RESUME_CMD = "resume"
 PAUSE_CMD = "pause"
 SUNFIRE_USERNAME = "tamelly"
-SUNFIRE_PASSWORD = "cg4002b16"
+SUNFIRE_PASSWORD = "cg4002b16" # Don't even try...
 
 class Client():
     def __init__(self, ip_addr, secret_key, bluno_num):
